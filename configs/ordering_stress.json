@@ -1,0 +1,36 @@
+{
+  "scenario": "ordering_stress_test",
+  "duration_secs": 10,
+  "producers": {
+    "count": 4,
+    "messages_per_sec": 2000000,
+    "distribution": {
+      "0": 1.0
+    }
+  },
+  "processors": {
+    "count": 1,
+    "processing_times_ns": {
+      "0": 50
+    }
+  },
+  "strategies": {
+    "count": 1,
+    "processing_times_ns": {
+      "0": 50
+    }
+  },
+  "stage1_rules": [
+    {
+      "msg_type": 0,
+      "processors": [0]
+    }
+  ],
+  "stage2_rules": [
+    {
+      "msg_type": 0,
+      "strategy": 0,
+      "ordering_required": true
+    }
+  ]
+}
