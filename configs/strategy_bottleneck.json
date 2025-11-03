@@ -5,18 +5,19 @@
     "count": 4,
     "messages_per_sec": 1000000,
     "distribution": {
-      "0": 0.5,
+      "0": 0.25,
       "1": 0.25,
-      "2": 0.25
+      "2": 0.25,
+      "3": 0.25
     }
   },
   "processors": {
     "count": 4,
     "processing_times_ns": {
-      "0": 50,
-      "1": 50,
-      "2": 50,
-      "3": 50
+      "0": 100,
+      "1": 100,
+      "2": 100,
+      "3": 100
     }
   },
   "strategies": {
@@ -30,14 +31,18 @@
   "stage1_rules": [
     {
       "msg_type": 0,
-      "processors": [0, 1]
+      "processors": [0]
     },
     {
       "msg_type": 1,
-      "processors": [2]
+      "processors": [1]
     },
     {
       "msg_type": 2,
+      "processors": [2]
+    },
+    {
+      "msg_type": 3,
       "processors": [3]
     }
   ],
@@ -55,6 +60,11 @@
     {
       "msg_type": 2,
       "strategy": 2,
+      "ordering_required": true
+    },
+    {
+      "msg_type": 3,
+      "strategy": 0,
       "ordering_required": true
     }
   ]

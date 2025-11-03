@@ -5,8 +5,11 @@ use std::collections::HashMap;
 pub struct Config {
     pub scenario: String,
     pub duration_secs: u64,
+    /// 4-8
     pub producers: Producers,
+    /// 4-8
     pub processors: Processors,
+    /// 2-4
     pub strategies: Strategies,
     pub stage1_rules: Vec<Stage1Rule>,
     pub stage2_rules: Vec<Stage2Rule>,
@@ -15,18 +18,19 @@ pub struct Config {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Phase {
     pub duration_ms: u64,
+    pub multiplier: f32,
     pub messages_per_sec: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BurstPattern {
-    pub interval_ms: u64,
     pub phases: Vec<Phase>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Producers {
     pub count: u32,
+    /// per producer
     pub messages_per_sec: Option<u32>,
     pub burst_pattern: Option<BurstPattern>,
     pub distribution: HashMap<String, f64>,

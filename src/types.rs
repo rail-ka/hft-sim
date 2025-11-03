@@ -1,7 +1,9 @@
 #[derive(Debug, Clone, Copy)]
 pub struct Message {
+    /// 0-7
     pub ty: u64,
     pub producer_id: u64,
+    /// incrementing per producer
     pub seq: u64,
     pub timestamp: u64,
 }

@@ -3,15 +3,17 @@
   "duration_secs": 20,
   "producers": {
     "count": 4,
+    "messages_per_sec": 1000000,
     "burst_pattern": {
-      "interval_ms": 2000,
       "phases": [
         {
           "duration_ms": 200,
+          "multiplier": 5,
           "messages_per_sec": 5000000
         },
         {
           "duration_ms": 1800,
+          "multiplier": 0.5,
           "messages_per_sec": 500000
         }
       ]
@@ -33,38 +35,29 @@
     }
   },
   "strategies": {
-    "count": 4,
+    "count": 3,
     "processing_times_ns": {
-      "0": 50,
-      "1": 50,
-      "2": 50,
-      "3": 50
+      "0": 100,
+      "1": 100,
+      "2": 100
     }
   },
   "stage1_rules": [
     {
       "msg_type": 0,
-      "processors": [
-        0
-      ]
+      "processors": [0]
     },
     {
       "msg_type": 1,
-      "processors": [
-        1
-      ]
+      "processors": [1]
     },
     {
       "msg_type": 2,
-      "processors": [
-        2
-      ]
+      "processors": [2]
     },
     {
       "msg_type": 3,
-      "processors": [
-        3
-      ]
+      "processors": [3]
     }
   ],
   "stage2_rules": [
@@ -85,7 +78,7 @@
     },
     {
       "msg_type": 3,
-      "strategy": 3,
+      "strategy": 0,
       "ordering_required": true
     }
   ]

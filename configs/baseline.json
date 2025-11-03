@@ -21,12 +21,11 @@
     }
   },
   "strategies": {
-    "count": 4,
+    "count": 3,
     "processing_times_ns": {
-      "0": 50,
-      "1": 50,
-      "2": 50,
-      "3": 50
+      "0": 100,
+      "1": 100,
+      "2": 100
     }
   },
   "stage1_rules": [
@@ -65,7 +64,7 @@
     },
     {
       "msg_type": 3,
-      "strategy": 3,
+      "strategy": 0,
       "ordering_required": true
     }
   ]

@@ -11,13 +11,13 @@
   "processors": {
     "count": 1,
     "processing_times_ns": {
-      "0": 50
+      "0": 100
     }
   },
   "strategies": {
     "count": 1,
     "processing_times_ns": {
-      "0": 50
+      "0": 100
     }
   },
   "stage1_rules": [
