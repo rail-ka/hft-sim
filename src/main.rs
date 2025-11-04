@@ -1,9 +1,17 @@
-use std::{collections::HashMap, env, fs, path::PathBuf, sync::Arc, thread, time::Duration};
+use std::{env, fs, path::PathBuf, sync::Arc, thread, time::Duration};
 
 mod config;
+mod log;
+mod processor;
+mod producer;
+mod strategy;
 mod types;
+
+#[macro_use]
+extern crate tracing;
+
 use crossbeam_queue::ArrayQueue;
-use quanta::{Clock, Instant};
+use quanta::{Clock, IntoNanoseconds};
 
 use crate::{
     config::Config,
@@ -11,21 +19,23 @@ use crate::{
 };
 
 fn main() {
+    log::init();
+
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        eprintln!("Usage: {} <config_path>", args[0]);
+        error!("Usage: {} <config_path>", args[0]);
         std::process::exit(1);
     }
     let config_path = &args[1];
     let config_path = PathBuf::from(config_path.as_str()).canonicalize().unwrap();
 
     let config_data = fs::read_to_string(&config_path).unwrap_or_else(|err| {
-        eprintln!("Failed to read config file {:?}: {}", config_path, err);
+        error!("Failed to read config file {:?}: {}", config_path, err);
         std::process::exit(1);
     });
 
     let config: config::Config = serde_json::from_str(&config_data).unwrap_or_else(|err| {
-        eprintln!("Failed to parse config: {}", err);
+        error!("Failed to parse config: {}", err);
         std::process::exit(1);
     });
 
@@ -39,7 +49,7 @@ fn main() {
         stage2_rules,
     } = config;
 
-    println!("Loaded config for scenario: {}", scenario);
+    info!("Loaded config for scenario: {}", scenario);
 
     if c_processors.count as usize != c_processors.processing_times_ns.len() {
         panic!("processors count error");
@@ -143,22 +153,22 @@ impl ProducerWorker {
         let clock = Clock::new();
         let instant = clock.now();
         // let duration = instant.duration_since(std::time::UNIX_EPOCH);
-        println!("ts: {ts}");
+        info!("ts: {ts}, instant: {instant:?}");
         let mut msg = Message {
             ty: 0,
             producer_id: id,
             seq: 0,
-            timestamp: ts,
+            timestamp: 0,
         };
         let nano_per_msg: u64 = 1_000_000_000u64 / (messages_per_sec as u64);
-        println!("nano_per_msg: {nano_per_msg}");
+        info!("nano_per_msg: {nano_per_msg}");
 
         distribution.sort_unstable_by_key(|(k, _)| *k);
         let distribution_pattern = create_distribution_pattern(&distribution, 100);
-        println!("distribution_pattern: {distribution_pattern:?}");
+        info!("distribution_pattern: {distribution_pattern:?}");
         let pattern_len = distribution_pattern.len();
         if pattern_len == 0 {
-            println!(
+            info!(
                 "Error: Distribution pattern is empty. Producer {} exiting.",
                 id
             );
@@ -166,14 +176,19 @@ impl ProducerWorker {
         }
 
         for s in 0..duration_secs {
-            println!("sec: {s}");
-            let raw_time = clock.raw();
-            let start_time = clock.now();
-            println!("raw_time: {raw_time}, start_time: {start_time:?}");
+            info!("sec: {s}");
+            // let now = clock.now();
+            let elapsed = instant.elapsed().into_nanos();
+            let now = ts + elapsed;
+            info!("elapsed: {elapsed}");
+            // let raw_time = clock.raw();
+            // let start_time = clock.now();
+            // info!("raw_time: {raw_time}, start_time: {start_time:?}");
 
             for i in 0..(messages_per_sec as usize) {
-                let target_time = raw_time + nano_per_msg;
-                let now = clock.raw();
+                let target_time = now + (nano_per_msg * i as u64);
+                let elapsed = instant.elapsed().into_nanos();
+                let now = ts + elapsed;
                 let msg_type = distribution_pattern[i % pattern_len];
                 msg.seq += 1;
                 msg.timestamp = now;
@@ -181,6 +196,7 @@ impl ProducerWorker {
                 stage.send(msg);
                 if now < target_time {
                     let ns = target_time - now;
+                    // info!(ns, "sleep");
                     thread::sleep(Duration::from_nanos(ns));
                 }
             }
