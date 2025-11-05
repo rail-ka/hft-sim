@@ -1,4 +1,5 @@
-use std::{env, fs, path::PathBuf, sync::Arc, thread, time::Duration};
+#![allow(dead_code, unused_variables)]
+use std::{env, fs, path::PathBuf, sync::Arc, thread};
 
 mod config;
 mod log;
@@ -11,10 +12,10 @@ mod types;
 extern crate tracing;
 
 use crossbeam_queue::ArrayQueue;
-use quanta::{Clock, IntoNanoseconds};
 
 use crate::{
     config::Config,
+    producer::ProducerWorker,
     types::{HandledMesage, Message},
 };
 
@@ -123,115 +124,6 @@ fn main() {
     for j in producers {
         j.join().unwrap();
     }
-}
-
-pub struct ProducerWorker {
-    id: u64,
-    duration_secs: u64,
-    messages_per_sec: u32,
-    distribution: Vec<(u64, f64)>,
-    stage: Arc<Stage1>,
-}
-
-fn timestamp() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("time went backwards")
-        .as_nanos() as u64
-}
-
-impl ProducerWorker {
-    fn run(self) {
-        let Self {
-            id,
-            duration_secs,
-            messages_per_sec,
-            mut distribution,
-            stage,
-        } = self;
-        let ts = timestamp();
-        let clock = Clock::new();
-        let instant = clock.now();
-        // let duration = instant.duration_since(std::time::UNIX_EPOCH);
-        info!("ts: {ts}, instant: {instant:?}");
-        let mut msg = Message {
-            ty: 0,
-            producer_id: id,
-            seq: 0,
-            timestamp: 0,
-        };
-        let nano_per_msg: u64 = 1_000_000_000u64 / (messages_per_sec as u64);
-        info!("nano_per_msg: {nano_per_msg}");
-
-        distribution.sort_unstable_by_key(|(k, _)| *k);
-        let distribution_pattern = create_distribution_pattern(&distribution, 100);
-        info!("distribution_pattern: {distribution_pattern:?}");
-        let pattern_len = distribution_pattern.len();
-        if pattern_len == 0 {
-            info!(
-                "Error: Distribution pattern is empty. Producer {} exiting.",
-                id
-            );
-            return;
-        }
-
-        for s in 0..duration_secs {
-            info!("sec: {s}");
-            // let now = clock.now();
-            let elapsed = instant.elapsed().into_nanos();
-            let now = ts + elapsed;
-            info!("elapsed: {elapsed}");
-            // let raw_time = clock.raw();
-            // let start_time = clock.now();
-            // info!("raw_time: {raw_time}, start_time: {start_time:?}");
-
-            for i in 0..(messages_per_sec as usize) {
-                let target_time = now + (nano_per_msg * i as u64);
-                let elapsed = instant.elapsed().into_nanos();
-                let now = ts + elapsed;
-                let msg_type = distribution_pattern[i % pattern_len];
-                msg.seq += 1;
-                msg.timestamp = now;
-                msg.ty = msg_type;
-                stage.send(msg);
-                if now < target_time {
-                    let ns = target_time - now;
-                    // info!(ns, "sleep");
-                    thread::sleep(Duration::from_nanos(ns));
-                }
-            }
-            // let now = clock.raw();
-            // let rem = now - raw_time;
-        }
-    }
-}
-
-fn create_distribution_pattern(distribution: &[(u64, f64)], pattern_size: usize) -> Vec<u64> {
-    let mut pattern = Vec::with_capacity(pattern_size);
-
-    for (msg_type, fraction) in distribution {
-        let count = (pattern_size as f64 * fraction).round() as usize;
-
-        for _ in 0..count {
-            if pattern.len() < pattern_size {
-                pattern.push(*msg_type);
-            }
-        }
-    }
-
-    // Из-за ошибок округления может не хватать/быть лишних элементов. Корректируем.
-    // Добавляем самый вероятный тип, чтобы минимизировать искажение
-    while pattern.len() < pattern_size {
-        let default_type = distribution
-            .iter()
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-            .map(|(k, _)| *k)
-            .unwrap_or(0);
-        pattern.push(default_type);
-    }
-
-    pattern.truncate(pattern_size);
-    pattern
 }
 
 pub struct Stage1 {}
