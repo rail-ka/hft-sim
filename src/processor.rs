@@ -1,7 +1,7 @@
-use std::{sync::Arc, thread::sleep, time::Duration};
+use std::sync::Arc;
 
 use crossbeam_channel::{Receiver, Sender};
-use quanta::{Clock, IntoNanoseconds};
+use quanta::Clock;
 
 use crate::{
     config::Stage2Rule,
@@ -35,8 +35,12 @@ impl ProcessorWorker {
             receiver,
             stage2_rules,
         } = self;
+        let mut ts = timestamp();
         let clock = Clock::new();
+        let raw_start = clock.raw();
         let mut err_arr = [[0u64; 8]; 8];
+
+        let mut prev = clock.raw();
 
         while let Ok(msg) = receiver.recv() {
             let strategy = stage2_rules
@@ -45,19 +49,27 @@ impl ProcessorWorker {
                 .unwrap()
                 .strategy;
             let strategy_sender = &strategies[strategy as usize];
-            let now = timestamp();
-            let instant = clock.now();
             let processing_time = processing_times
                 .iter()
                 .find(|(t, _)| *t == msg.ty)
                 .unwrap()
                 .1;
-            let nanos = processing_time.saturating_sub(instant.elapsed().into_nanos());
-            sleep(Duration::from_nanos(nanos));
+
+            let mut raw = clock.raw();
+            let mut delta = clock.delta_as_nanos(prev, raw);
+
+            while delta < processing_time {
+                std::hint::spin_loop();
+                raw = clock.raw();
+                delta = clock.delta_as_nanos(prev, raw);
+            }
+            prev = raw;
+            ts += delta;
+
             let res = strategy_sender.try_send(HandledMesage {
                 msg,
                 processor_id: id,
-                processing_ts: now,
+                processing_ts: ts,
             });
             if let Err(err) = res {
                 err_arr[msg.ty as usize][strategy as usize] += 1;

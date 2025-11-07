@@ -1,7 +1,5 @@
-use std::{thread::sleep, time::Duration};
-
 use crossbeam_channel::Receiver;
-use quanta::{Clock, IntoNanoseconds};
+use quanta::Clock;
 
 use crate::types::{HandledMesage, Message};
 
@@ -22,8 +20,10 @@ impl StrategyWorker {
         } = self;
         let mut seq_arr = [[0u64; 8]; 8];
         let clock = Clock::new();
+        let raw_start = clock.raw();
 
         let mut errors = 0usize;
+        let mut prev = clock.raw();
 
         while let Ok(item) = receiver.recv() {
             let HandledMesage {
@@ -37,15 +37,22 @@ impl StrategyWorker {
                 processor_id,
                 processing_ts,
             } = item;
-            let instant = clock.now();
 
             let last = &mut seq_arr[processor_id as usize][ty as usize];
             if *last > seq {
                 errors += 1;
             }
             *last = seq;
-            let nanos = processing_time.saturating_sub(instant.elapsed().into_nanos());
-            sleep(Duration::from_nanos(nanos));
+
+            let mut raw = clock.raw();
+            let mut delta = clock.delta_as_nanos(prev, raw);
+
+            while delta < processing_time {
+                std::hint::spin_loop();
+                raw = clock.raw();
+                delta = clock.delta_as_nanos(prev, raw);
+            }
+            prev = raw;
         }
         if errors != 0 {
             let fmt = human_format::Formatter::new();

@@ -74,9 +74,11 @@ fn main() {
         .collect_vec();
     debug!(?strategies_iter);
 
+    const STRATEGIES_QUEUE_CAP: usize = 1_000_000;
+
     for (index, (id, v)) in strategies_iter {
         assert_eq!(id, index as u64);
-        let (s, r) = bounded(512 * 512);
+        let (s, r) = bounded(STRATEGIES_QUEUE_CAP);
         strategies_queues.push(s);
         let worker = StrategyWorker {
             id,
@@ -101,8 +103,10 @@ fn main() {
 
     let strategies_queues = Arc::new(strategies_queues);
 
+    const PROCESSORS_QUEUE_CAP: usize = 1_000_000;
+
     for id in 0..c_processors.count {
-        let (s, r) = bounded(512 * 512);
+        let (s, r) = bounded(PROCESSORS_QUEUE_CAP);
         processors_queues.push(s);
         let worker = ProcessorWorker {
             id,

@@ -1,7 +1,7 @@
-use std::{sync::Arc, thread, time::Duration};
+use std::sync::Arc;
 
 use crossbeam_channel::Sender;
-use quanta::{Clock, IntoNanoseconds};
+use quanta::Clock;
 use rand::{rng, seq::SliceRandom};
 
 use crate::{config::Stage1Rule, types::Message, utils::timestamp};
@@ -27,10 +27,10 @@ impl ProducerWorker {
             stage1_rules,
             // stage,
         } = self;
-        let ts = timestamp();
+        let mut ts = timestamp();
         let clock = Clock::new();
-        let instant = clock.now();
-        debug!("ts: {ts}, instant: {instant:?}");
+        let raw_start = clock.raw();
+        debug!(ts, raw_start);
         let mut msg = Message {
             ty: 0,
             producer_id: id,
@@ -38,7 +38,7 @@ impl ProducerWorker {
             timestamp: 0,
         };
         let nano_per_msg = 1_000_000_000u64 / messages_per_sec;
-        info!("nano_per_msg: {nano_per_msg}");
+        info!(nano_per_msg);
 
         distribution.sort_unstable_by_key(|(k, _)| *k);
         let distribution_pattern = create_distribution_pattern(&distribution);
@@ -54,18 +54,25 @@ impl ProducerWorker {
 
         let mut err_arr = [[0u64; 8]; 8];
 
-        for s in 0..duration_secs {
-            info!(id, "sec: {s}");
-            let elapsed = instant.elapsed().into_nanos();
-            let now = ts + elapsed;
+        for sec in 0..duration_secs {
+            info!(id, sec);
+
+            let mut prev = clock.raw();
 
             for i in 0..messages_per_sec {
-                let target_time = now + (nano_per_msg * i);
-                let elapsed = instant.elapsed().into_nanos();
-                let now = ts + elapsed;
+                let mut raw = clock.raw();
+                let mut delta = clock.delta_as_nanos(prev, raw);
+                while delta < nano_per_msg {
+                    std::hint::spin_loop();
+                    raw = clock.raw();
+                    delta = clock.delta_as_nanos(prev, raw);
+                }
+                prev = raw;
+                ts += delta;
+
                 let msg_type = distribution_pattern[(i as usize) % pattern_len];
                 msg.seq += 1;
-                msg.timestamp = now;
+                msg.timestamp = ts;
                 msg.ty = msg_type;
                 let processor_id: u64 = stage1_rules
                     .iter()
@@ -75,10 +82,6 @@ impl ProducerWorker {
                 let res = processors[processor_id as usize].try_send(msg);
                 if let Err(err) = res {
                     err_arr[msg_type as usize][processor_id as usize] += 1;
-                }
-                if now < target_time {
-                    let ns = target_time - now;
-                    thread::sleep(Duration::from_nanos(ns));
                 }
             }
         }
