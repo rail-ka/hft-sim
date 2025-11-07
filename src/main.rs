@@ -1,4 +1,3 @@
-// #![allow(dead_code, unused_variables)]
 use std::{
     env,
     fs::{self, File},
@@ -68,6 +67,10 @@ fn main() {
 
     info!("Loaded config for scenario: {scenario}");
 
+    let mut core_ids = core_affinity::get_core_ids().unwrap();
+    info!(?core_ids);
+    core_ids.reverse();
+
     let zero_messages_counts = Arc::new(AtomicU64::new(0));
     let handled_zero_messages_counts = Arc::new(AtomicU64::new(0));
 
@@ -106,7 +109,16 @@ fn main() {
             processing_time: v,
             handled_zero_messages_counts: handled_zero_messages_counts.clone(),
         };
-        let handle = thread::spawn(|| worker.run());
+        let cid = core_ids.pop();
+        let handle = thread::spawn(move || {
+            if let Some(cid) = cid {
+                let res = core_affinity::set_for_current(cid);
+                if !res {
+                    warn!("cannot pin {cid:?} thread for strategy: {id}");
+                }
+            }
+            worker.run();
+        });
         strategies_handles.push(handle);
     }
 
@@ -137,7 +149,16 @@ fn main() {
             receiver: r,
             stage2_rules: stage2_rules.clone(),
         };
-        let handle = thread::spawn(|| worker.run());
+        let cid = core_ids.pop();
+        let handle = thread::spawn(move || {
+            if let Some(cid) = cid {
+                let res = core_affinity::set_for_current(cid);
+                if !res {
+                    warn!("cannot pin {cid:?} thread for processor: {id}");
+                }
+            }
+            worker.run();
+        });
         processors_handles.push(handle);
     }
     drop(strategies_queues);
@@ -196,7 +217,16 @@ fn main() {
             stage1_rules: stage1_rules.clone(),
             zero_messages_counts: zero_messages_counts.clone(),
         };
-        let handle = thread::spawn(|| worker.run());
+        let cid = core_ids.pop();
+        let handle = thread::spawn(move || {
+            if let Some(cid) = cid {
+                let res = core_affinity::set_for_current(cid);
+                if !res {
+                    warn!("cannot pin {cid:?} thread for producer: {i}");
+                }
+            }
+            worker.run();
+        });
         producers_handles.push(handle);
     }
     drop(processors_queues);

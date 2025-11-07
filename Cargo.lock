@@ -247,6 +247,7 @@ name = "hft"
 version = "0.1.0"
 dependencies = [
  "arrayvec",
+ "core_affinity",
  "crossbeam-channel",
  "disruptor",
  "human_format",

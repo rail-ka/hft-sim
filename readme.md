@@ -9,3 +9,10 @@ processor:
 TODO:
 - сделать балансировку для stage1, если в stage1_rules в processors могут быть несколько значений
 - роутинг к стратегиям для правильной очередности
+- добавить треды для стейджей?
+
+benchmark:
+- crossbeam-channel
+- kanal
+- thingbuf
+- disruptor
