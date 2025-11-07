@@ -46,7 +46,7 @@ impl ProducerWorker {
 
         distribution.sort_unstable_by_key(|(k, _)| *k);
         let distribution_pattern = create_distribution_pattern(&distribution);
-        debug!("distribution_pattern: {distribution_pattern:?}");
+        info!("distribution_pattern: {distribution_pattern:?}");
         let pattern_len = distribution_pattern.len();
         if pattern_len == 0 {
             info!(

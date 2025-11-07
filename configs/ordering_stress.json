@@ -5,19 +5,19 @@
     "count": 4,
     "messages_per_sec": 2000000,
     "distribution": {
-      "0": 1.0
+      "msg_type_0": 1.0
     }
   },
   "processors": {
     "count": 1,
     "processing_times_ns": {
-      "0": 100
+      "msg_type_0": 100
     }
   },
   "strategies": {
     "count": 1,
     "processing_times_ns": {
-      "0": 100
+      "strategy_0": 100
     }
   },
   "stage1_rules": [
