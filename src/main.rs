@@ -50,7 +50,7 @@ fn main() {
         stage2_rules,
     } = config;
 
-    info!("Loaded config for scenario: {}", scenario);
+    info!("Loaded config for scenario: {scenario}");
 
     let mut producers_handles = Vec::with_capacity(c_producers.count as usize);
     let mut processors_handles = Vec::with_capacity(c_processors.count as usize);
@@ -72,13 +72,14 @@ fn main() {
         .sorted_unstable_by_key(|(id, _)| *id)
         .enumerate()
         .collect_vec();
-    info!(?strategies_iter);
+    debug!(?strategies_iter);
 
     for (index, (id, v)) in strategies_iter {
         assert_eq!(id, index as u64);
         let (s, r) = bounded(512 * 512);
         strategies_queues.push(s);
         let worker = StrategyWorker {
+            id,
             receiver: r,
             processing_time: v,
         };
@@ -113,6 +114,7 @@ fn main() {
         let handle = thread::spawn(|| worker.run());
         processors_handles.push(handle);
     }
+    drop(strategies_queues);
 
     // let mut stage1_queues = stage1_rules
     //     .into_iter()
@@ -170,6 +172,7 @@ fn main() {
         let handle = thread::spawn(|| worker.run());
         producers_handles.push(handle);
     }
+    drop(processors_queues);
 
     for j in producers_handles {
         j.join().unwrap();

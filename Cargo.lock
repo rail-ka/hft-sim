@@ -106,6 +106,7 @@ dependencies = [
  "arrayvec",
  "crossbeam-channel",
  "disruptor",
+ "human_format",
  "itertools",
  "kanal",
  "metrics",
@@ -117,6 +118,12 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
 ]
+
+[[package]]
+name = "human_format"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c3b1f728c459d27b12448862017b96ad4767b1ec2ec5e6434e99f1577f085b8"
 
 [[package]]
 name = "itertools"

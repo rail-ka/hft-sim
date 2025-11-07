@@ -1,7 +1,7 @@
-use std::sync::Arc;
+use std::{sync::Arc, thread::sleep, time::Duration};
 
 use crossbeam_channel::{Receiver, Sender};
-use quanta::Clock;
+use quanta::{Clock, IntoNanoseconds};
 
 use crate::{
     config::Stage2Rule,
@@ -36,21 +36,39 @@ impl ProcessorWorker {
             stage2_rules,
         } = self;
         let clock = Clock::new();
+        let mut err_arr = [[0u64; 8]; 8];
+
         while let Ok(msg) = receiver.recv() {
             let strategy = stage2_rules
                 .iter()
                 .find(|i| i.msg_type == msg.ty)
                 .unwrap()
                 .strategy;
-            let strategy = &strategies[strategy as usize];
+            let strategy_sender = &strategies[strategy as usize];
             let now = timestamp();
-            let res = strategy.try_send(HandledMesage {
+            let instant = clock.now();
+            let processing_time = processing_times
+                .iter()
+                .find(|(t, _)| *t == msg.ty)
+                .unwrap()
+                .1;
+            let nanos = processing_time.saturating_sub(instant.elapsed().into_nanos());
+            sleep(Duration::from_nanos(nanos));
+            let res = strategy_sender.try_send(HandledMesage {
                 msg,
                 processor_id: id,
                 processing_ts: now,
             });
             if let Err(err) = res {
-                error!("send error for msg: {msg:?}");
+                err_arr[msg.ty as usize][strategy as usize] += 1;
+            }
+        }
+        let fmt = human_format::Formatter::new();
+        for (ty, inner) in err_arr.iter().enumerate() {
+            for (strategy, count) in inner.iter().enumerate() {
+                if *count != 0 {
+                    error!(ty, strategy, "{}", fmt.format(*count as f64));
+                }
             }
         }
     }

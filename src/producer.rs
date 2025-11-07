@@ -30,7 +30,7 @@ impl ProducerWorker {
         let ts = timestamp();
         let clock = Clock::new();
         let instant = clock.now();
-        info!("ts: {ts}, instant: {instant:?}");
+        debug!("ts: {ts}, instant: {instant:?}");
         let mut msg = Message {
             ty: 0,
             producer_id: id,
@@ -42,7 +42,7 @@ impl ProducerWorker {
 
         distribution.sort_unstable_by_key(|(k, _)| *k);
         let distribution_pattern = create_distribution_pattern(&distribution);
-        info!("distribution_pattern: {distribution_pattern:?}");
+        debug!("distribution_pattern: {distribution_pattern:?}");
         let pattern_len = distribution_pattern.len();
         if pattern_len == 0 {
             info!(
@@ -52,8 +52,10 @@ impl ProducerWorker {
             return;
         }
 
+        let mut err_arr = [[0u64; 8]; 8];
+
         for s in 0..duration_secs {
-            info!("sec: {s}");
+            info!(id, "sec: {s}");
             let elapsed = instant.elapsed().into_nanos();
             let now = ts + elapsed;
 
@@ -72,11 +74,19 @@ impl ProducerWorker {
                     .processors[0];
                 let res = processors[processor_id as usize].try_send(msg);
                 if let Err(err) = res {
-                    error!("send error for msg: {msg:?}");
+                    err_arr[msg_type as usize][processor_id as usize] += 1;
                 }
                 if now < target_time {
                     let ns = target_time - now;
                     thread::sleep(Duration::from_nanos(ns));
+                }
+            }
+        }
+        let fmt = human_format::Formatter::new();
+        for (ty, inner) in err_arr.iter().enumerate() {
+            for (processor, count) in inner.iter().enumerate() {
+                if *count != 0 {
+                    error!(ty, processor, "{}", fmt.format(*count as f64));
                 }
             }
         }
@@ -95,7 +105,7 @@ fn create_distribution_pattern(distribution: &[(u64, f64)]) -> Vec<u64> {
         })
         .collect::<Vec<_>>();
 
-    info!(?items);
+    debug!(?items);
 
     loop {
         let mut added_in_this_round = false;

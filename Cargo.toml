@@ -24,3 +24,17 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
 ] }
 kanal = { version = "0.1", default-features = false }
 thingbuf = "0.1"
+human_format = "1.1.0"
+
+[profile.release]
+lto = true
+#strip = "symbols"
+# target-feature="+avx2"
+# target-feature=+aes,+avx,+avx2,+fma,+mmx,+sha,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+sse4a,+ssse3
+## +avx512f,+avx512bw,+avx512cd,+avx512dq,+avx512v
+### rustc --print target-features
+
+[profile.profiling]
+inherits = "release"
+strip = "debuginfo"
+debug = 1
