@@ -25,6 +25,7 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
 kanal = { version = "0.1", default-features = false }
 thingbuf = "0.1"
 human_format = "1.1.0"
+pprof = { version = "0.15", default-features = false, features = ["flamegraph"] }
 
 [profile.release]
 lto = true

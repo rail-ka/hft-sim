@@ -42,6 +42,9 @@ impl ProcessorWorker {
 
         let mut prev = clock.raw();
 
+        let mut total_msg = 0usize;
+        let mut nanos_per_sec = 0u64;
+
         while let Ok(msg) = receiver.recv() {
             let strategy = stage2_rules
                 .iter()
@@ -73,6 +76,15 @@ impl ProcessorWorker {
             });
             if let Err(err) = res {
                 err_arr[msg.ty as usize][strategy as usize] += 1;
+            } else {
+                total_msg += 1;
+            }
+            if nanos_per_sec < 1_000_000_000 {
+                nanos_per_sec += delta;
+            } else {
+                nanos_per_sec = 0;
+                let channel_len = receiver.len();
+                info!(id, channel_len, total_msg);
             }
         }
         let fmt = human_format::Formatter::new();
@@ -83,5 +95,6 @@ impl ProcessorWorker {
                 }
             }
         }
+        info!(id, total_msg);
     }
 }

@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
 
 use crossbeam_channel::Sender;
 use quanta::Clock;
@@ -13,6 +16,7 @@ pub struct ProducerWorker {
     pub distribution: Vec<(u64, f64)>,
     pub processors: Arc<Vec<Sender<Message>>>,
     pub stage1_rules: Vec<Stage1Rule>,
+    pub zero_messages_counts: Arc<AtomicU64>,
     // pub stage: Arc<Stage1>,
 }
 
@@ -25,7 +29,7 @@ impl ProducerWorker {
             mut distribution,
             processors,
             stage1_rules,
-            // stage,
+            zero_messages_counts,
         } = self;
         let mut ts = timestamp();
         let clock = Clock::new();
@@ -53,6 +57,9 @@ impl ProducerWorker {
         }
 
         let mut err_arr = [[0u64; 8]; 8];
+
+        let mut total_msg = 0usize;
+        let mut total_zero_msgs = 0u64;
 
         for sec in 0..duration_secs {
             info!(id, sec);
@@ -82,6 +89,11 @@ impl ProducerWorker {
                 let res = processors[processor_id as usize].try_send(msg);
                 if let Err(err) = res {
                     err_arr[msg_type as usize][processor_id as usize] += 1;
+                } else {
+                    total_msg += 1;
+                }
+                if msg_type == 0 {
+                    total_zero_msgs += 1;
                 }
             }
         }
@@ -93,6 +105,8 @@ impl ProducerWorker {
                 }
             }
         }
+        zero_messages_counts.fetch_add(total_zero_msgs, Ordering::SeqCst);
+        info!(id, total_msg);
     }
 }
 

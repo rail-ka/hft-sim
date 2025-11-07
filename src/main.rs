@@ -1,5 +1,14 @@
 #![allow(dead_code, unused_variables)]
-use std::{env, fs, path::PathBuf, sync::Arc, thread};
+use std::{
+    env,
+    fs::{self, File},
+    path::PathBuf,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+    thread,
+};
 
 mod config;
 mod log;
@@ -21,6 +30,13 @@ use crate::{
 
 fn main() {
     log::init();
+
+    let guard = pprof::ProfilerGuardBuilder::default()
+        .frequency(1000)
+        // .blocklist(&["libc", "libgcc", "pthread", "vdso"])
+        .blocklist(&["libc", "pthread", "vdso"])
+        .build()
+        .unwrap();
 
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
@@ -51,6 +67,9 @@ fn main() {
     } = config;
 
     info!("Loaded config for scenario: {scenario}");
+
+    let zero_messages_counts = Arc::new(AtomicU64::new(0));
+    let handled_zero_messages_counts = Arc::new(AtomicU64::new(0));
 
     let mut producers_handles = Vec::with_capacity(c_producers.count as usize);
     let mut processors_handles = Vec::with_capacity(c_processors.count as usize);
@@ -84,6 +103,7 @@ fn main() {
             id,
             receiver: r,
             processing_time: v,
+            handled_zero_messages_counts: handled_zero_messages_counts.clone(),
         };
         let handle = thread::spawn(|| worker.run());
         strategies_handles.push(handle);
@@ -172,6 +192,7 @@ fn main() {
             distribution,
             processors: processors_queues.clone(),
             stage1_rules: stage1_rules.clone(),
+            zero_messages_counts: zero_messages_counts.clone(),
         };
         let handle = thread::spawn(|| worker.run());
         producers_handles.push(handle);
@@ -187,6 +208,15 @@ fn main() {
     for j in strategies_handles {
         j.join().unwrap();
     }
+
+    let zero_messages_counts = zero_messages_counts.load(Ordering::SeqCst);
+    let handled_zero_messages_counts = handled_zero_messages_counts.load(Ordering::SeqCst);
+    info!(zero_messages_counts, handled_zero_messages_counts);
+
+    if let Ok(report) = guard.report().build() {
+        let file = File::create("flamegraph.svg").unwrap();
+        report.flamegraph(file).unwrap();
+    };
 }
 
 // pub struct Stage1Item {
