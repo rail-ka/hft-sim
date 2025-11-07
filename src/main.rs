@@ -7,6 +7,7 @@ mod processor;
 mod producer;
 mod strategy;
 mod types;
+mod utils;
 
 #[macro_use]
 extern crate tracing;

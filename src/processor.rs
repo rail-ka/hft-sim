@@ -6,6 +6,7 @@ use quanta::Clock;
 use crate::{
     config::Stage2Rule,
     types::{HandledMesage, Message},
+    utils::timestamp,
 };
 
 // pub struct ProcessorIdQueue {
@@ -35,13 +36,22 @@ impl ProcessorWorker {
             stage2_rules,
         } = self;
         let clock = Clock::new();
-        while let Ok(item) = receiver.recv() {
-            let Message {
-                ty,
-                producer_id,
-                seq,
-                timestamp,
-            } = item;
+        while let Ok(msg) = receiver.recv() {
+            let strategy = stage2_rules
+                .iter()
+                .find(|i| i.msg_type == msg.ty)
+                .unwrap()
+                .strategy;
+            let strategy = &strategies[strategy as usize];
+            let now = timestamp();
+            let res = strategy.try_send(HandledMesage {
+                msg,
+                processor_id: id,
+                processing_ts: now,
+            });
+            if let Err(err) = res {
+                error!("send error for msg: {msg:?}");
+            }
         }
     }
 }

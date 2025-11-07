@@ -4,7 +4,7 @@ use crossbeam_channel::Sender;
 use quanta::{Clock, IntoNanoseconds};
 use rand::{rng, seq::SliceRandom};
 
-use crate::{config::Stage1Rule, types::Message};
+use crate::{config::Stage1Rule, types::Message, utils::timestamp};
 
 pub struct ProducerWorker {
     pub id: u64,
@@ -14,13 +14,6 @@ pub struct ProducerWorker {
     pub processors: Arc<Vec<Sender<Message>>>,
     pub stage1_rules: Vec<Stage1Rule>,
     // pub stage: Arc<Stage1>,
-}
-
-fn timestamp() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("time went backwards")
-        .as_nanos() as u64
 }
 
 impl ProducerWorker {
