@@ -38,7 +38,7 @@ impl StrategyWorker {
                 processing_ts,
             } = item;
 
-            let last = &mut seq_arr[processor_id as usize][ty as usize];
+            let last = &mut seq_arr[producer_id as usize][ty as usize];
             if *last > seq {
                 errors += 1;
             }
