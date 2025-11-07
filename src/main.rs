@@ -11,12 +11,11 @@ mod types;
 #[macro_use]
 extern crate tracing;
 
-use crossbeam_queue::ArrayQueue;
+use crossbeam_channel::bounded;
+use itertools::Itertools;
 
 use crate::{
-    config::Config,
-    producer::ProducerWorker,
-    types::{HandledMesage, Message},
+    config::Config, processor::ProcessorWorker, producer::ProducerWorker, strategy::StrategyWorker,
 };
 
 fn main() {
@@ -52,39 +51,98 @@ fn main() {
 
     info!("Loaded config for scenario: {}", scenario);
 
-    if c_processors.count as usize != c_processors.processing_times_ns.len() {
-        panic!("processors count error");
-    }
+    let mut producers_handles = Vec::with_capacity(c_producers.count as usize);
+    let mut processors_handles = Vec::with_capacity(c_processors.count as usize);
+    let mut strategies_handles = Vec::with_capacity(c_strategies.count as usize);
+
     if c_strategies.count as usize != c_strategies.processing_times_ns.len() {
         panic!("strategies count error");
     }
 
-    let mut producers = Vec::with_capacity(c_producers.count as usize);
-    let mut processors = Vec::with_capacity(c_processors.count as usize);
-    let mut strategies = Vec::with_capacity(c_strategies.count as usize);
+    let mut strategies_queues = Vec::with_capacity(c_strategies.count as usize);
 
-    let mut stage1_queues = stage1_rules
+    let strategies_iter = c_strategies
+        .processing_times_ns
         .into_iter()
-        .map(|rule| {
-            rule.msg_type;
-            rule.processors;
-            let queue = ArrayQueue::<Message>::new(512 * 512);
-            queue
+        .map(|(k, v)| {
+            let id: u64 = k.trim_start_matches("strategy_").parse().unwrap();
+            (id, v)
         })
-        .collect::<Vec<_>>();
-    let mut stage2_queues = stage2_rules
+        .sorted_unstable_by_key(|(id, _)| *id)
+        .enumerate()
+        .collect_vec();
+    info!(?strategies_iter);
+
+    for (index, (id, v)) in strategies_iter {
+        assert_eq!(id, index as u64);
+        let (s, r) = bounded(512 * 512);
+        strategies_queues.push(s);
+        let worker = StrategyWorker {
+            receiver: r,
+            processing_time: v,
+        };
+        let handle = thread::spawn(|| worker.run());
+        strategies_handles.push(handle);
+    }
+
+    let processors_processing_times = c_processors
+        .processing_times_ns
         .into_iter()
-        .map(|rule| {
-            rule.strategy;
-            rule.msg_type;
-            rule.ordering_required;
-            let queue = ArrayQueue::<HandledMesage>::new(512 * 512);
-            queue
+        .map(|(k, v)| {
+            let id: u64 = k.trim_start_matches("msg_type_").parse().unwrap();
+            (id, v)
         })
+        .sorted_unstable_by_key(|(id, _)| *id)
         .collect::<Vec<_>>();
 
-    let stage1 = Stage1 {};
-    let stage1 = Arc::new(stage1);
+    let mut processors_queues = Vec::with_capacity(c_processors.count as usize);
+
+    let strategies_queues = Arc::new(strategies_queues);
+
+    for id in 0..c_processors.count {
+        let (s, r) = bounded(512 * 512);
+        processors_queues.push(s);
+        let worker = ProcessorWorker {
+            id,
+            processing_times: processors_processing_times.clone(),
+            strategies: strategies_queues.clone(),
+            receiver: r,
+            stage2_rules: stage2_rules.clone(),
+        };
+        let handle = thread::spawn(|| worker.run());
+        processors_handles.push(handle);
+    }
+
+    // let mut stage1_queues = stage1_rules
+    //     .into_iter()
+    //     .map(|rule| {
+    //         let processors = rule
+    //             .processors
+    //             .into_iter()
+    //             .map(|id| {
+    //                 let queue = ArrayQueue::<Message>::new(512 * 512);
+    //                 ProcessorIdQueue { id, queue }
+    //             })
+    //             .collect();
+    //         Stage1Item {
+    //             msg_type: rule.msg_type,
+    //             processors,
+    //         }
+    //     })
+    //     .collect::<Vec<_>>();
+    // let mut stage2_queues = stage2_rules
+    //     .into_iter()
+    //     .map(|rule| {
+    //         rule.strategy;
+    //         rule.msg_type;
+    //         rule.ordering_required;
+    //         let queue = ArrayQueue::<HandledMesage>::new(512 * 512);
+    //         queue
+    //     })
+    //     .collect::<Vec<_>>();
+
+    // let stage1 = Stage1 { rules: Vec::new() };
+    // let stage1 = Arc::new(stage1);
 
     let distribution = c_producers
         .distribution
@@ -95,45 +153,49 @@ fn main() {
         })
         .collect::<Vec<_>>();
 
+    let processors_queues = Arc::new(processors_queues);
+
     for i in 0..c_producers.count {
-        let stage = stage1.clone();
+        // let stage = stage1.clone();
         let distribution = distribution.clone();
         let worker = ProducerWorker {
-            id: i as u64,
+            id: i,
             duration_secs,
             messages_per_sec: c_producers.messages_per_sec.unwrap(),
             distribution,
-            stage,
+            processors: processors_queues.clone(),
+            stage1_rules: stage1_rules.clone(),
         };
         let handle = thread::spawn(|| worker.run());
-        producers.push(handle);
+        producers_handles.push(handle);
     }
 
-    for (k, v) in c_processors.processing_times_ns {
-        let id: u32 = k.trim_start_matches("msg_type_").parse().unwrap();
-        let handle = thread::spawn(move || {});
-        processors.push(handle);
+    for j in producers_handles {
+        j.join().unwrap();
     }
-
-    for (k, v) in c_strategies.processing_times_ns {
-        let id: u32 = k.trim_start_matches("strategy_").parse().unwrap();
-        let handle = thread::spawn(move || {});
-        strategies.push(handle);
+    for j in processors_handles {
+        j.join().unwrap();
     }
-
-    for j in producers {
+    for j in strategies_handles {
         j.join().unwrap();
     }
 }
 
-pub struct Stage1 {}
+// pub struct Stage1Item {
+//     pub msg_type: u64,
+//     pub processors: Vec<ProcessorIdQueue>,
+// }
 
-impl Stage1 {
-    pub fn send(&self, msg: Message) {}
-}
+// pub struct Stage1 {
+//     pub rules: Vec<Stage1Item>,
+// }
 
-pub struct Stage2 {}
+// impl Stage1 {
+//     pub fn send(&self, msg: Message) {}
+// }
 
-impl Stage2 {
-    pub fn senf(&self, msg: HandledMesage) {}
-}
+// pub struct Stage2 {}
+
+// impl Stage2 {
+//     pub fn senf(&self, msg: HandledMesage) {}
+// }

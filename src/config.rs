@@ -18,8 +18,8 @@ pub struct Config {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Phase {
     pub duration_ms: u64,
-    pub multiplier: f32,
-    pub messages_per_sec: u32,
+    pub multiplier: f64,
+    pub messages_per_sec: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,34 +29,34 @@ pub struct BurstPattern {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Producers {
-    pub count: u32,
+    pub count: u64,
     /// per producer
-    pub messages_per_sec: Option<u32>,
+    pub messages_per_sec: Option<u64>,
     pub burst_pattern: Option<BurstPattern>,
     pub distribution: HashMap<String, f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Processors {
-    pub count: u32,
+    pub count: u64,
     pub processing_times_ns: HashMap<String, u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Strategies {
-    pub count: u32,
+    pub count: u64,
     pub processing_times_ns: HashMap<String, u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Stage1Rule {
-    pub msg_type: u32,
-    pub processors: Vec<u32>,
+    pub msg_type: u64,
+    pub processors: Vec<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Stage2Rule {
-    pub msg_type: u32,
-    pub strategy: u32,
+    pub msg_type: u64,
+    pub strategy: u64,
     pub ordering_required: bool,
 }
