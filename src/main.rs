@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_variables)]
+// #![allow(dead_code, unused_variables)]
 use std::{
     env,
     fs::{self, File},
@@ -21,7 +21,7 @@ mod utils;
 #[macro_use]
 extern crate tracing;
 
-use crossbeam_channel::{bounded, unbounded};
+use crossbeam_channel::unbounded;
 use itertools::Itertools;
 
 use crate::{
@@ -93,7 +93,7 @@ fn main() {
         .collect_vec();
     debug!(?strategies_iter);
 
-    const STRATEGIES_QUEUE_CAP: usize = 1024 * 8 * 8;
+    const _STRATEGIES_QUEUE_CAP: usize = 1024 * 8 * 8;
 
     for (index, (id, v)) in strategies_iter {
         assert_eq!(id, index as u64);
@@ -124,7 +124,7 @@ fn main() {
 
     let strategies_queues = Arc::new(strategies_queues);
 
-    const PROCESSORS_QUEUE_CAP: usize = 1024 * 8 * 8;
+    const _PROCESSORS_QUEUE_CAP: usize = 1024 * 8 * 8;
 
     for id in 0..c_processors.count {
         // let (s, r) = bounded(PROCESSORS_QUEUE_CAP);
@@ -186,12 +186,12 @@ fn main() {
 
     for i in 0..c_producers.count {
         // let stage = stage1.clone();
-        let distribution = distribution.clone();
         let worker = ProducerWorker {
             id: i,
             duration_secs,
-            messages_per_sec: c_producers.messages_per_sec.unwrap(),
-            distribution,
+            messages_per_sec: c_producers.messages_per_sec,
+            distribution: distribution.clone(),
+            burst_pattern: c_producers.burst_pattern.clone(),
             processors: processors_queues.clone(),
             stage1_rules: stage1_rules.clone(),
             zero_messages_counts: zero_messages_counts.clone(),

@@ -37,7 +37,6 @@ impl ProcessorWorker {
         } = self;
         let mut ts = timestamp();
         let clock = Clock::new();
-        let raw_start = clock.raw();
         let mut err_arr = [[0u64; 8]; 8];
 
         let mut prev = clock.raw();
@@ -74,7 +73,7 @@ impl ProcessorWorker {
                 processor_id: id,
                 processing_ts: ts,
             });
-            if let Err(err) = res {
+            if res.is_err() {
                 err_arr[msg.ty as usize][strategy as usize] += 1;
             } else {
                 total_msg += 1;

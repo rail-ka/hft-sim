@@ -19,21 +19,15 @@ pub struct Config {
 pub struct Phase {
     pub duration_ms: u64,
     pub multiplier: f64,
-    pub messages_per_sec: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BurstPattern {
-    pub phases: Vec<Phase>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Producers {
     pub count: u64,
     /// per producer
-    pub messages_per_sec: Option<u64>,
-    pub burst_pattern: Option<BurstPattern>,
+    pub messages_per_sec: u64,
     pub distribution: HashMap<String, f64>,
+    pub burst_pattern: Option<Vec<Phase>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

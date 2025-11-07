@@ -27,7 +27,6 @@ impl StrategyWorker {
         } = self;
         let mut seq_arr = [[0u64; 8]; 8];
         let clock = Clock::new();
-        let raw_start = clock.raw();
 
         let mut errors = 0usize;
         let mut prev = clock.raw();
@@ -47,6 +46,9 @@ impl StrategyWorker {
                 processor_id,
                 processing_ts,
             } = item;
+
+            let _ = processor_id;
+            let _processing_time = timestamp - processing_ts;
 
             let last = &mut seq_arr[producer_id as usize][ty as usize];
             if *last > seq {
