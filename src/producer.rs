@@ -37,6 +37,7 @@ impl ProducerWorker {
             stage1_rules,
             zero_messages_counts,
         } = self;
+        let fmt = human_format::Formatter::new();
         let mut ts = timestamp();
         let clock = Clock::new();
         let mut msg = Message {
@@ -126,7 +127,7 @@ impl ProducerWorker {
                 info!(nano_per_msg);
 
                 for sec in 0..duration_secs {
-                    info!(id, sec);
+                    debug!(id, sec);
 
                     let mut prev = clock.raw();
 
@@ -164,7 +165,6 @@ impl ProducerWorker {
             }
         }
 
-        let fmt = human_format::Formatter::new();
         for (ty, inner) in err_arr.iter().enumerate() {
             for (processor, count) in inner.iter().enumerate() {
                 if *count != 0 {
@@ -173,6 +173,7 @@ impl ProducerWorker {
             }
         }
         zero_messages_counts.fetch_add(total_zero_msgs, Ordering::SeqCst);
+        let total_msg = fmt.format(total_msg as f64);
         info!(id, total_msg);
     }
 }

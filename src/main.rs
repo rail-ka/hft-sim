@@ -13,6 +13,8 @@ mod config;
 mod log;
 mod processor;
 mod producer;
+mod stage1;
+mod stage2;
 mod strategy;
 mod types;
 mod utils;
@@ -32,8 +34,7 @@ fn main() {
 
     let guard = pprof::ProfilerGuardBuilder::default()
         .frequency(1000)
-        // .blocklist(&["libc", "libgcc", "pthread", "vdso"])
-        .blocklist(&["libc", "pthread", "vdso"])
+        .blocklist(&["libc", "pthread"])
         .build()
         .unwrap();
 
@@ -42,8 +43,10 @@ fn main() {
         error!("Usage: {} <config_path>", args[0]);
         std::process::exit(1);
     }
+    info!("args: 0: {}, 1: {}", &args[0], &args[1]);
     let config_path = &args[1];
     let config_path = PathBuf::from(config_path.as_str()).canonicalize().unwrap();
+    info!("config_path: {}", config_path.to_string_lossy());
 
     let config_data = fs::read_to_string(&config_path).unwrap_or_else(|err| {
         error!("Failed to read config file {:?}: {}", config_path, err);
@@ -68,7 +71,7 @@ fn main() {
     info!("Loaded config for scenario: {scenario}");
 
     let mut core_ids = core_affinity::get_core_ids().unwrap();
-    info!(?core_ids);
+    debug!(?core_ids);
     core_ids.reverse();
 
     let zero_messages_counts = Arc::new(AtomicU64::new(0));
@@ -110,15 +113,18 @@ fn main() {
             handled_zero_messages_counts: handled_zero_messages_counts.clone(),
         };
         let cid = core_ids.pop();
-        let handle = thread::spawn(move || {
-            if let Some(cid) = cid {
-                let res = core_affinity::set_for_current(cid);
-                if !res {
-                    warn!("cannot pin {cid:?} thread for strategy: {id}");
+        let handle = thread::Builder::new()
+            .name(format!("strategy_{id}"))
+            .spawn(move || {
+                if let Some(cid) = cid {
+                    let res = core_affinity::set_for_current(cid);
+                    if !res {
+                        warn!("cannot pin {cid:?} thread for strategy: {id}");
+                    }
                 }
-            }
-            worker.run();
-        });
+                worker.run();
+            })
+            .unwrap();
         strategies_handles.push(handle);
     }
 
@@ -150,15 +156,18 @@ fn main() {
             stage2_rules: stage2_rules.clone(),
         };
         let cid = core_ids.pop();
-        let handle = thread::spawn(move || {
-            if let Some(cid) = cid {
-                let res = core_affinity::set_for_current(cid);
-                if !res {
-                    warn!("cannot pin {cid:?} thread for processor: {id}");
+        let handle = thread::Builder::new()
+            .name(format!("processor_{id}"))
+            .spawn(move || {
+                if let Some(cid) = cid {
+                    let res = core_affinity::set_for_current(cid);
+                    if !res {
+                        warn!("cannot pin {cid:?} thread for processor: {id}");
+                    }
                 }
-            }
-            worker.run();
-        });
+                worker.run();
+            })
+            .unwrap();
         processors_handles.push(handle);
     }
     drop(strategies_queues);
@@ -218,15 +227,18 @@ fn main() {
             zero_messages_counts: zero_messages_counts.clone(),
         };
         let cid = core_ids.pop();
-        let handle = thread::spawn(move || {
-            if let Some(cid) = cid {
-                let res = core_affinity::set_for_current(cid);
-                if !res {
-                    warn!("cannot pin {cid:?} thread for producer: {i}");
+        let handle = thread::Builder::new()
+            .name(format!("producer_{i}"))
+            .spawn(move || {
+                if let Some(cid) = cid {
+                    let res = core_affinity::set_for_current(cid);
+                    if !res {
+                        warn!("cannot pin {cid:?} thread for producer: {i}");
+                    }
                 }
-            }
-            worker.run();
-        });
+                worker.run();
+            })
+            .unwrap();
         producers_handles.push(handle);
     }
     drop(processors_queues);
@@ -250,22 +262,3 @@ fn main() {
         report.flamegraph(file).unwrap();
     };
 }
-
-// pub struct Stage1Item {
-//     pub msg_type: u64,
-//     pub processors: Vec<ProcessorIdQueue>,
-// }
-
-// pub struct Stage1 {
-//     pub rules: Vec<Stage1Item>,
-// }
-
-// impl Stage1 {
-//     pub fn send(&self, msg: Message) {}
-// }
-
-// pub struct Stage2 {}
-
-// impl Stage2 {
-//     pub fn senf(&self, msg: HandledMesage) {}
-// }

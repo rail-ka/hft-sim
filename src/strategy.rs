@@ -27,6 +27,7 @@ impl StrategyWorker {
         } = self;
         let mut seq_arr = [[0u64; 8]; 8];
         let clock = Clock::new();
+        let fmt = human_format::Formatter::new();
 
         let mut errors = 0usize;
         let mut prev = clock.raw();
@@ -75,14 +76,19 @@ impl StrategyWorker {
             } else {
                 nanos_per_sec = 0;
                 let channel_len = receiver.len();
+                let channel_len = fmt.format(channel_len as f64);
+                let total_msg = fmt.format(total_msg as f64);
+                let total_zero_msgs = fmt.format(total_zero_msgs as f64);
                 info!(id, channel_len, total_msg, total_zero_msgs);
             }
         }
         if errors != 0 {
-            let fmt = human_format::Formatter::new();
             error!(id, "{}", fmt.format(errors as f64));
         }
         handled_zero_messages_counts.fetch_add(total_zero_msgs, Ordering::SeqCst);
+
+        let total_msg = fmt.format(total_msg as f64);
+        let total_zero_msgs = fmt.format(total_zero_msgs as f64);
         info!(id, total_msg, total_zero_msgs);
     }
 }

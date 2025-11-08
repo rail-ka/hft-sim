@@ -9,20 +9,14 @@ use crate::{
     utils::timestamp,
 };
 
-// pub struct ProcessorIdQueue {
-//     pub id: u64,
-//     pub queue: ProcessorQueue,
-// }
-
-// pub type ProcessorQueue = ArrayQueue<Message>;
 pub type ProcessorReceiver = Receiver<Message>;
 pub type SrategySender = Sender<HandledMesage>;
 
 pub struct ProcessorWorker {
     pub id: u64,
     pub processing_times: Vec<(u64, u64)>,
-    pub strategies: Arc<Vec<SrategySender>>,
     pub receiver: ProcessorReceiver,
+    pub strategies: Arc<Vec<SrategySender>>,
     pub stage2_rules: Vec<Stage2Rule>,
 }
 
@@ -35,6 +29,7 @@ impl ProcessorWorker {
             receiver,
             stage2_rules,
         } = self;
+        let fmt = human_format::Formatter::new();
         let mut ts = timestamp();
         let clock = Clock::new();
         let mut err_arr = [[0u64; 8]; 8];
@@ -83,10 +78,11 @@ impl ProcessorWorker {
             } else {
                 nanos_per_sec = 0;
                 let channel_len = receiver.len();
+                let channel_len = fmt.format(channel_len as f64);
+                let total_msg = fmt.format(total_msg as f64);
                 info!(id, channel_len, total_msg);
             }
         }
-        let fmt = human_format::Formatter::new();
         for (ty, inner) in err_arr.iter().enumerate() {
             for (strategy, count) in inner.iter().enumerate() {
                 if *count != 0 {
@@ -94,6 +90,7 @@ impl ProcessorWorker {
                 }
             }
         }
+        let total_msg = fmt.format(total_msg as f64);
         info!(id, total_msg);
     }
 }

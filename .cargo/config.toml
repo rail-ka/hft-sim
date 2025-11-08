@@ -3,3 +3,11 @@ git-fetch-with-cli = true
 
 [env]
 RUST_LOG = "debug"
+
+[profile.release]
+lto = true
+
+[profile.profiling]
+inherits = "release"
+strip = "debuginfo"
+debug = true
