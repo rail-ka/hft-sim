@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, fs::read_to_string, path::Path};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -13,6 +13,16 @@ pub struct Config {
     pub strategies: Strategies,
     pub stage1_rules: Vec<Stage1Rule>,
     pub stage2_rules: Vec<Stage2Rule>,
+}
+
+impl Config {
+    pub fn init(path: impl AsRef<Path>) -> eyre::Result<Self> {
+        let path = path.as_ref();
+        info!("config_path: {}", path.to_string_lossy());
+        let config_data = read_to_string(path)?;
+        let config: Self = serde_json::from_str(&config_data)?;
+        Ok(config)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

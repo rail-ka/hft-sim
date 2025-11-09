@@ -3,11 +3,15 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
-// use crossbeam_channel::Receiver;
+use eyre::bail;
+use itertools::Itertools;
 use kanal::Receiver;
 use quanta::Clock;
 
-use crate::types::{HandledMesage, Message};
+use crate::{
+    config::Config,
+    types::{HandledMesage, Message},
+};
 
 pub type SrategyReceiver = Receiver<HandledMesage>;
 
@@ -19,6 +23,29 @@ pub struct StrategyWorker {
 }
 
 impl StrategyWorker {
+    pub fn init(config: &Config) -> eyre::Result<Self> {
+        let c_strategies = &config.strategies;
+
+        if c_strategies.count as usize != c_strategies.processing_times_ns.len() {
+            bail!("strategies count error");
+        }
+
+        // let mut strategies_handles = Vec::with_capacity(c_strategies.count as usize);
+
+        let strategies_iter = c_strategies
+            .processing_times_ns
+            .iter()
+            .map(|(k, v)| {
+                let id: u64 = k.trim_start_matches("strategy_").parse().unwrap();
+                (id, *v)
+            })
+            .sorted_unstable_by_key(|(id, _)| *id)
+            .enumerate()
+            .collect_vec();
+        debug!(?strategies_iter);
+        todo!()
+    }
+
     pub fn run(self) {
         let Self {
             id,

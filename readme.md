@@ -11,15 +11,24 @@ TODO:
 - роутинг к стратегиям для правильной очередности
 - добавить треды для стейджей?
 
-benchmark:
-- crossbeam-channel
-- kanal
-- thingbuf
-- disruptor
-
 commands:
 
 ```bash
 cargo build --profile profiling
 samply record ./target/profiling/hft /Users/railka/lab/rust/hft/configs/baseline.json
 ```
+
+## Stage threads
+
+если мы вводим новые потоки для stage1 и stage2, какие должны быть очереди между всеми потоками?
+
+возможно мы возьмем SPSC для producers, processors, strategies.
+- producer будет иметь только Sender
+- processor будет иметь Receiver<Message>, Sender<HandledMessage>
+- strategy будет иметь только Receiver
+
+у них все операции блокирующие через spin loop.
+
+stage1 будет принимать сообщения от producer и отправлять processor на основе конфига: если processor один, то ему, если несколько, то тому, который менее загружен. Если processor загружен, откладываем во внутреннюю очередь.
+
+stage2 будет принимать сообщения от processor, валидировать сортировку/очередность, отправлять strategy.

@@ -58,6 +58,12 @@ impl ProducerWorker {
         let mut total_msg = 0usize;
         let mut total_zero_msgs = 0u64;
 
+        let mut msg_routes = stage1_rules
+            .into_iter()
+            .sorted_by_key(|i| i.msg_type)
+            .map(|i| i.processors.into_iter().cycle())
+            .collect_vec();
+
         match burst_pattern {
             Some(pattern) => {
                 let mut duration_mss = duration_secs * 1000;
@@ -78,7 +84,7 @@ impl ProducerWorker {
                 'a: loop {
                     for (duration_ms, msg_per_ms, nano_per_msg) in pattern.iter().copied() {
                         for ms in 0..duration_ms {
-                            for i in 0..msg_per_ms {
+                            for _ in 0..msg_per_ms {
                                 let mut raw = clock.raw();
                                 let mut delta = clock.delta_as_nanos(prev, raw);
                                 while delta < nano_per_msg {
@@ -93,11 +99,7 @@ impl ProducerWorker {
                                 msg.seq += 1;
                                 msg.ty = msg_type;
                                 msg.timestamp = ts;
-                                let processor_id: u64 = stage1_rules
-                                    .iter()
-                                    .find(|i| i.msg_type == msg.ty)
-                                    .unwrap()
-                                    .processors[0];
+                                let processor_id: u64 = msg_routes[msg.ty as usize].next().unwrap();
                                 let res = processors[processor_id as usize].try_send(msg);
                                 if res.is_err() {
                                     err_arr[msg.ty as usize][processor_id as usize] += 1;
@@ -160,11 +162,7 @@ impl ProducerWorker {
                         msg.seq += 1;
                         msg.timestamp = ts;
                         msg.ty = msg_type;
-                        let processor_id: u64 = stage1_rules
-                            .iter()
-                            .find(|i| i.msg_type == msg_type)
-                            .unwrap()
-                            .processors[0];
+                        let processor_id: u64 = msg_routes[msg.ty as usize].next().unwrap();
                         let res = processors[processor_id as usize].try_send(msg);
                         if res.is_err() {
                             err_arr[msg_type as usize][processor_id as usize] += 1;
