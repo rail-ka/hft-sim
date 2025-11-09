@@ -3,7 +3,8 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
-use crossbeam_channel::Receiver;
+// use crossbeam_channel::Receiver;
+use kanal::Receiver;
 use quanta::Clock;
 
 use crate::types::{HandledMesage, Message};

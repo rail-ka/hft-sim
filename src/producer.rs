@@ -3,8 +3,9 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
-use crossbeam_channel::Sender;
+// use crossbeam_channel::Sender;
 use itertools::Itertools;
+use kanal::Sender;
 use quanta::Clock;
 use rand::{rng, seq::SliceRandom};
 
@@ -50,14 +51,7 @@ impl ProducerWorker {
         distribution.sort_unstable_by_key(|(k, _)| *k);
         let distribution_pattern = create_distribution_pattern(&distribution);
         info!("distribution_pattern: {distribution_pattern:?}");
-        let pattern_len = distribution_pattern.len();
-        if pattern_len == 0 {
-            info!(
-                "Error: Distribution pattern is empty. Producer {} exiting.",
-                id
-            );
-            return;
-        }
+        let mut distribution_pattern = distribution_pattern.into_iter().cycle();
 
         let mut err_arr = [[0u64; 8]; 8];
 
@@ -83,7 +77,7 @@ impl ProducerWorker {
 
                 'a: loop {
                     for (duration_ms, msg_per_ms, nano_per_msg) in pattern.iter().copied() {
-                        for _ in 0..duration_ms {
+                        for ms in 0..duration_ms {
                             for i in 0..msg_per_ms {
                                 let mut raw = clock.raw();
                                 let mut delta = clock.delta_as_nanos(prev, raw);
@@ -95,8 +89,10 @@ impl ProducerWorker {
                                 prev = raw;
                                 ts += delta;
 
+                                let msg_type = distribution_pattern.next().unwrap();
                                 msg.seq += 1;
-                                msg.ty = distribution_pattern[(i as usize) % pattern_len];
+                                msg.ty = msg_type;
+                                msg.timestamp = ts;
                                 let processor_id: u64 = stage1_rules
                                     .iter()
                                     .find(|i| i.msg_type == msg.ty)
@@ -111,6 +107,11 @@ impl ProducerWorker {
                                         total_zero_msgs += 1;
                                     }
                                 }
+                            }
+                            let sec = ms / 1000;
+                            if ms % 1000 == 0 {
+                                let total_msg = fmt.format(total_msg as f64);
+                                info!(id, sec, total_msg);
                             }
                         }
                         let (n, overflow) = duration_mss.overflowing_sub(duration_ms);
@@ -129,20 +130,33 @@ impl ProducerWorker {
                 for sec in 0..duration_secs {
                     debug!(id, sec);
 
-                    let mut prev = clock.raw();
+                    let mut ts = timestamp();
+                    let start_of_second_raw = clock.raw();
+                    // let mut prev = clock.raw();
+                    let mut wait_cycles = 0u64;
 
                     for i in 0..messages_per_sec {
-                        let mut raw = clock.raw();
-                        let mut delta = clock.delta_as_nanos(prev, raw);
-                        while delta < nano_per_msg {
+                        let target_nanos = (i + 1) * nano_per_msg;
+                        let mut delta = clock.delta_as_nanos(start_of_second_raw, clock.raw());
+
+                        while delta < target_nanos {
                             std::hint::spin_loop();
-                            raw = clock.raw();
-                            delta = clock.delta_as_nanos(prev, raw);
+                            delta = clock.delta_as_nanos(start_of_second_raw, clock.raw());
+                            wait_cycles += 1;
                         }
-                        prev = raw;
                         ts += delta;
 
-                        let msg_type = distribution_pattern[(i as usize) % pattern_len];
+                        // let mut raw = clock.raw();
+                        // let mut delta = clock.delta_as_nanos(prev, raw);
+                        // while delta < nano_per_msg {
+                        //     std::hint::spin_loop();
+                        //     raw = clock.raw();
+                        //     delta = clock.delta_as_nanos(prev, raw);
+                        // }
+                        // prev = raw;
+                        // ts += delta;
+
+                        let msg_type = distribution_pattern.next().unwrap();
                         msg.seq += 1;
                         msg.timestamp = ts;
                         msg.ty = msg_type;
@@ -161,6 +175,8 @@ impl ProducerWorker {
                             }
                         }
                     }
+                    let total_msg = fmt.format(total_msg as f64);
+                    info!(id, sec, total_msg, wait_cycles);
                 }
             }
         }

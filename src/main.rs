@@ -22,8 +22,9 @@ mod utils;
 #[macro_use]
 extern crate tracing;
 
-use crossbeam_channel::unbounded;
+// use crossbeam_channel::bounded;
 use itertools::Itertools;
+use kanal::bounded;
 
 use crate::{
     config::Config, processor::ProcessorWorker, producer::ProducerWorker, strategy::StrategyWorker,
@@ -99,12 +100,12 @@ fn main() {
         .collect_vec();
     debug!(?strategies_iter);
 
-    const _STRATEGIES_QUEUE_CAP: usize = 1024 * 8 * 8;
+    const STRATEGIES_QUEUE_CAP: usize = 40_000_000;
 
     for (index, (id, v)) in strategies_iter {
         assert_eq!(id, index as u64);
-        // let (s, r) = bounded(STRATEGIES_QUEUE_CAP);
-        let (s, r) = unbounded();
+        let (s, r) = bounded(STRATEGIES_QUEUE_CAP);
+        // let (s, r) = unbounded();
         strategies_queues.push(s);
         let worker = StrategyWorker {
             id,
@@ -142,11 +143,11 @@ fn main() {
 
     let strategies_queues = Arc::new(strategies_queues);
 
-    const _PROCESSORS_QUEUE_CAP: usize = 1024 * 8 * 8;
+    const PROCESSORS_QUEUE_CAP: usize = 40_000_000;
 
     for id in 0..c_processors.count {
-        // let (s, r) = bounded(PROCESSORS_QUEUE_CAP);
-        let (s, r) = unbounded();
+        let (s, r) = bounded(PROCESSORS_QUEUE_CAP);
+        // let (s, r) = unbounded();
         processors_queues.push(s);
         let worker = ProcessorWorker {
             id,

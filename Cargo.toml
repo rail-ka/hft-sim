@@ -10,6 +10,8 @@ quanta = "0.12"
 rand = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+human_format = "1.1"
+core_affinity = "0.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = [
     "std",
@@ -18,21 +20,16 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
     "tracing-log",
     "parking_lot",
 ] }
-human_format = "1.1"
 pprof = { version = "0.15", default-features = false, features = ["flamegraph"] }
-core_affinity = "0.8"
 
 crossbeam-channel = "0.5"
 kanal = { version = "0.1", default-features = false }
+rtrb = "0.3"
+ringbuf = "0.4"
 disruptor = "3.6"
 
 [profile.release]
 lto = true
-#strip = "symbols"
-# target-feature="+avx2"
-# target-feature=+aes,+avx,+avx2,+fma,+mmx,+sha,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+sse4a,+ssse3
-## +avx512f,+avx512bw,+avx512cd,+avx512dq,+avx512v
-### rustc --print target-features
 
 [profile.profiling]
 inherits = "release"

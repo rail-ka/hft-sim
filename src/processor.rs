@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use crossbeam_channel::{Receiver, Sender};
+// use crossbeam_channel::{Receiver, Sender};
+use kanal::{Receiver, Sender};
 use quanta::Clock;
 
 use crate::{

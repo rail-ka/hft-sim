@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Message {
     /// 0-7
     pub ty: u64,
@@ -8,7 +8,7 @@ pub struct Message {
     pub timestamp: u64,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct HandledMesage {
     pub msg: Message,
     pub processor_id: u64,

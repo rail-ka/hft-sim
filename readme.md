@@ -16,3 +16,10 @@ benchmark:
 - kanal
 - thingbuf
 - disruptor
+
+commands:
+
+```bash
+cargo build --profile profiling
+samply record ./target/profiling/hft /Users/railka/lab/rust/hft/configs/baseline.json
+```

@@ -3,7 +3,7 @@
   "duration_secs": 10,
   "producers": {
     "count": 4,
-    "messages_per_sec": 1000000,
+    "messages_per_sec": 10000000,
     "distribution": {
       "msg_type_0": 0.25,
       "msg_type_1": 0.25,
@@ -14,18 +14,18 @@
   "processors": {
     "count": 4,
     "processing_times_ns": {
-      "msg_type_0": 100,
-      "msg_type_1": 100,
-      "msg_type_2": 100,
-      "msg_type_3": 100
+      "msg_type_0": 10,
+      "msg_type_1": 10,
+      "msg_type_2": 10,
+      "msg_type_3": 10
     }
   },
   "strategies": {
     "count": 3,
     "processing_times_ns": {
-      "strategy_0": 100,
-      "strategy_1": 100,
-      "strategy_2": 100
+      "strategy_0": 10,
+      "strategy_1": 10,
+      "strategy_2": 10
     }
   },
   "stage1_rules": [
