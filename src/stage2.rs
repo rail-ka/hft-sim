@@ -1,16 +1,86 @@
+use std::thread::{self, JoinHandle};
+
 use crate::{
-    config::Stage2Rule,
-    types::{HandledMessage, Message},
+    Arr,
+    config::{Config, Stage2Rule},
+    types::HandledMessage,
 };
 
+// use ringbuf::{
+//     HeapRb,
+//     traits::{Consumer as RConsumer, Observer, Split},
+// };
+use rtrb::{Consumer, Producer, RingBuffer};
+
 pub struct Stage2 {
-    pub stage2_rules: Vec<Stage2Rule>,
-    // pub receivers: Vec<Receiver>,
+    pub processor_cons: Arr<Consumer<HandledMessage>>,
+    pub strategy_prod: Arr<Producer<HandledMessage>>,
+    pub stage2_rules: Arr<Stage2Rule>,
 }
 
 impl Stage2 {
-    fn recv(&self) -> Option<Message> {
-        todo!()
+    pub fn new(
+        config: &Config,
+    ) -> (
+        Self,
+        Arr<Consumer<HandledMessage>>,
+        Arr<Producer<HandledMessage>>,
+    ) {
+        let (strategy_prod, strategy_cons): (Arr<_>, Arr<_>) = (0..config.strategies.count)
+            .map(|_| RingBuffer::<HandledMessage>::new(10_000_000))
+            .unzip();
+
+        let (processor_prod, processor_cons): (Arr<_>, Arr<_>) = (0..config.processors.count)
+            .map(|_| RingBuffer::<HandledMessage>::new(10_000_000))
+            .unzip();
+
+        let s = Self {
+            processor_cons,
+            strategy_prod,
+            stage2_rules: config.stage2_rules.iter().cloned().collect(),
+        };
+        (s, strategy_cons, processor_prod)
     }
-    fn send(&self, msg: HandledMessage) {}
+
+    pub fn run(self) -> JoinHandle<()> {
+        thread::Builder::new()
+            .name("stage2".to_string())
+            .spawn(|| {
+                let Self {
+                    mut processor_cons,
+                    mut strategy_prod,
+                    stage2_rules,
+                } = self;
+                // let (p, mut c) = HeapRb::<HandledMessage>::new(1000_000).split();
+                let mut len = processor_cons.len();
+                'a: loop {
+                    let iter = processor_cons.iter_mut();
+                    for cons in iter {
+                        if cons.is_abandoned() {
+                            len -= 1;
+                            if len == 0 {
+                                break 'a;
+                            }
+                        }
+                        if cons.is_empty() {
+                            continue;
+                        }
+                        let slots = cons.slots();
+                        // let chunks = cons.read_chunk(slots).unwrap();
+                        for _ in 0..slots {
+                            let msg = cons.pop().unwrap();
+                            let strategy = stage2_rules
+                                .iter()
+                                .find(|i| i.msg_type == msg.msg.ty)
+                                .unwrap()
+                                .strategy;
+                            let strategy_sender = &mut strategy_prod[strategy as usize];
+                            strategy_sender.push(msg).unwrap();
+                        }
+                    }
+                }
+                info!("stage2 stopped");
+            })
+            .unwrap()
+    }
 }

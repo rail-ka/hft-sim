@@ -1,37 +1,34 @@
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::Receiver;
 use quanta::Clock;
 
 use crate::{
-    config::Stage2Rule,
+    traits::ProcessorSender,
     types::{HandledMessage, Message},
 };
 
 pub type ProcessorReceiver = Receiver<Message>;
-pub type StrategySender = Sender<HandledMessage>;
 
-pub struct ProcessorWorker {
+pub struct ProcessorWorker<S: ProcessorSender> {
     pub id: u64,
     pub processing_times: Vec<(u64, u64)>,
     pub receiver: ProcessorReceiver,
-    pub strategies: Vec<StrategySender>,
-    pub stage2_rules: Vec<Stage2Rule>,
+    pub sender: S,
     pub start_ts: u64,
     pub clock: Clock,
 }
 
-impl ProcessorWorker {
+impl<S: ProcessorSender> ProcessorWorker<S> {
     pub fn run(self) {
         let ProcessorWorker {
             id,
             processing_times,
-            strategies,
             receiver,
-            stage2_rules,
+            mut sender,
             start_ts,
             clock,
         } = self;
         let fmt = human_format::Formatter::new();
-        let mut err_arr = [[0u64; 8]; 8];
+        let mut err_arr = [0u64; 8];
 
         let mut prev = clock.raw();
 
@@ -39,15 +36,10 @@ impl ProcessorWorker {
         let mut nanos_per_sec = 0u64;
 
         while let Ok(msg) = receiver.recv() {
-            let strategy = stage2_rules
-                .iter()
-                .find(|i| i.msg_type == msg.ty)
-                .unwrap()
-                .strategy;
-            let strategy_sender = &strategies[strategy as usize];
+            let msg_ty = msg.ty;
             let processing_time = processing_times
                 .iter()
-                .find(|(t, _)| *t == msg.ty)
+                .find(|(t, _)| *t == msg_ty)
                 .unwrap()
                 .1;
 
@@ -61,13 +53,14 @@ impl ProcessorWorker {
             prev = raw;
             let timestamp = clock.delta_as_nanos(start_ts, clock.raw());
 
-            let res = strategy_sender.try_send(HandledMessage {
+            let msg = HandledMessage {
                 msg,
                 processor_id: id,
                 processing_ts: timestamp,
-            });
-            if res.is_err() {
-                err_arr[msg.ty as usize][strategy as usize] += 1;
+            };
+            let ok = sender.send(msg);
+            if !ok {
+                err_arr[msg_ty as usize] += 1;
             } else {
                 total_msg += 1;
             }
@@ -81,11 +74,9 @@ impl ProcessorWorker {
                 info!(id, channel_len, total_msg);
             }
         }
-        for (ty, inner) in err_arr.iter().enumerate() {
-            for (strategy, count) in inner.iter().enumerate() {
-                if *count != 0 {
-                    error!(ty, strategy, "{}", fmt.format(*count as f64));
-                }
+        for (ty, count) in err_arr.iter().enumerate() {
+            if *count != 0 {
+                error!(ty, "{}", fmt.format(*count as f64));
             }
         }
         let total_msg = fmt.format(total_msg as f64);

@@ -26,7 +26,7 @@ impl<R: StrategyReceiver> StrategyWorker<R> {
     pub fn run(self) {
         let Self {
             id,
-            receiver,
+            mut receiver,
             processing_time,
             handled_zero_messages_counts,
             start_ts,
@@ -43,7 +43,7 @@ impl<R: StrategyReceiver> StrategyWorker<R> {
         let mut total_zero_msgs = 0u64;
         let mut nanos_per_sec = 0u64;
 
-        while let Some(item) = receiver.recv() {
+        while let Some(item) = receiver.next() {
             let HandledMessage {
                 msg:
                     Message {

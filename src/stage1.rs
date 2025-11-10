@@ -1,11 +1,11 @@
 use crossbeam_channel::Sender;
 use itertools::Itertools;
 
-use crate::{config::Stage1Rule, types::Message};
+use crate::{Arr, config::Stage1Rule, types::Message};
 
 #[derive(Clone)]
 pub struct Stage1 {
-    msg_routes: Vec<Vec<Sender<Message>>>,
+    msg_routes: Arr<Arr<Sender<Message>>>,
 }
 
 impl Stage1 {
@@ -17,9 +17,9 @@ impl Stage1 {
                 i.processors
                     .into_iter()
                     .map(|i| processors[i as usize].clone())
-                    .collect_vec()
+                    .collect()
             })
-            .collect_vec();
+            .collect();
         Self { msg_routes }
     }
 
@@ -30,7 +30,7 @@ impl Stage1 {
         }
         let index = (msg.producer_id as usize) % rule.len();
         rule[index].try_send(msg).is_ok()
-        // if we need balancing (but not ordering reguired):
+        // TODO: if we need balancing (but not ordering reguired):
         // rule.iter()
         //     .min_by_key(|q| q.len())
         //     .unwrap()

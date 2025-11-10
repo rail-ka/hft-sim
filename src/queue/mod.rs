@@ -14,7 +14,7 @@ use quanta::Clock;
 
 use crate::{
     config::Config, processor::ProcessorWorker, producer::ProducerWorker, stage1::Stage1,
-    strategy::StrategyWorker,
+    strategy::StrategyWorker, traits::QueueProcessorSender,
 };
 
 pub fn run(config: Config) -> eyre::Result<()> {
@@ -110,14 +110,17 @@ pub fn run(config: Config) -> eyre::Result<()> {
     for id in 0..c_processors.count {
         let (s, r) = bounded(PROCESSORS_QUEUE_CAP);
         processors_queues.push(s);
+        let sender = QueueProcessorSender {
+            queues: strategies_queues.iter().cloned().collect(),
+            rules: stage2_rules.clone(),
+        };
         let worker = ProcessorWorker {
             id,
             processing_times: processors_processing_times.clone(),
-            strategies: strategies_queues.clone(),
             receiver: r,
-            stage2_rules: stage2_rules.clone(),
             start_ts,
             clock: clock.clone(),
+            sender,
         };
         let cid = core_ids.pop();
         let handle = thread::Builder::new()

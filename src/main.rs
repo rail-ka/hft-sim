@@ -1,5 +1,7 @@
 use std::{fs::File, path::PathBuf};
 
+use arrayvec::ArrayVec;
+
 mod config;
 mod log;
 mod processor;
@@ -15,6 +17,8 @@ mod types;
 
 #[macro_use]
 extern crate tracing;
+
+pub type Arr<T> = ArrayVec<T, 8>;
 
 #[derive(argh::FromArgs)]
 /// Args
