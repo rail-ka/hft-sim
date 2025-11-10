@@ -7,7 +7,7 @@ use itertools::Itertools;
 use quanta::Clock;
 use rand::{rng, seq::SliceRandom};
 
-use crate::{config::Phase, stage1::Stage1, types::Message, utils::timestamp};
+use crate::{config::Phase, stage1::Stage1, types::Message};
 
 pub struct ProducerWorker {
     pub id: u64,
@@ -17,6 +17,8 @@ pub struct ProducerWorker {
     pub burst_pattern: Option<Vec<Phase>>,
     pub stage1: Stage1,
     pub zero_messages_counts: Arc<AtomicU64>,
+    pub start_ts: u64,
+    pub clock: Clock,
 }
 
 impl ProducerWorker {
@@ -29,14 +31,15 @@ impl ProducerWorker {
             burst_pattern,
             stage1: senders,
             zero_messages_counts,
+            start_ts,
+            clock,
         } = self;
         let fmt = human_format::Formatter::new();
-        let clock = Clock::new();
         let mut msg = Message {
             producer_id: id,
             ty: 0,
             seq: 0,
-            timestamp: timestamp(),
+            timestamp: 0,
         };
 
         distribution.sort_unstable_by_key(|(k, _)| *k);
@@ -66,7 +69,7 @@ impl ProducerWorker {
                     let msg_type = distribution_pattern.next().unwrap();
                     msg.seq += 1;
                     msg.ty = msg_type;
-                    msg.timestamp += delta;
+                    msg.timestamp = clock.delta_as_nanos(start_ts, clock.raw());
                     let res = senders.send(msg);
                     if !res {
                         err_arr[msg_type as usize] += 1;

@@ -29,6 +29,7 @@ impl Config {
 
         let fmt = human_format::Formatter::new();
         let messages_per_sec = fmt.format(config.producers.messages_per_sec as f64);
+        info!("Loaded config for scenario: {}", config.scenario);
         info!(
             messages_per_sec,
             config.producers.count, config.processors.count, config.strategies.count

@@ -3,6 +3,7 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
+use hdrhistogram::sync::Recorder;
 use quanta::Clock;
 
 use crate::{
@@ -15,6 +16,10 @@ pub struct StrategyWorker<R: StrategyReceiver> {
     pub receiver: R,
     pub processing_time: u64,
     pub handled_zero_messages_counts: Arc<AtomicU64>,
+    pub start_ts: u64,
+    pub clock: Clock,
+    pub p_histogram: Recorder<u64>,
+    pub c_histogram: Recorder<u64>,
 }
 
 impl<R: StrategyReceiver> StrategyWorker<R> {
@@ -24,9 +29,12 @@ impl<R: StrategyReceiver> StrategyWorker<R> {
             receiver,
             processing_time,
             handled_zero_messages_counts,
+            start_ts,
+            clock,
+            mut p_histogram,
+            mut c_histogram,
         } = self;
         let mut seq_arr = [[0u64; 8]; 8];
-        let clock = Clock::new();
         let fmt = human_format::Formatter::new();
 
         let mut errors = 0usize;
@@ -49,7 +57,8 @@ impl<R: StrategyReceiver> StrategyWorker<R> {
             } = item;
 
             let _ = processor_id;
-            let _processing_time = timestamp - processing_ts;
+            let p_time = processing_ts - timestamp;
+            p_histogram.saturating_record(p_time);
 
             let last = &mut seq_arr[producer_id as usize][ty as usize];
             if *last >= seq {
@@ -80,6 +89,9 @@ impl<R: StrategyReceiver> StrategyWorker<R> {
                 let total_zero_msgs = fmt.format(total_zero_msgs as f64);
                 info!(id, channel_len, total_msg, total_zero_msgs);
             }
+
+            let timestamp = clock.delta_as_nanos(start_ts, clock.raw());
+            c_histogram.saturating_record(timestamp - processing_ts);
         }
         if errors != 0 {
             error!(id, "{}", fmt.format(errors as f64));

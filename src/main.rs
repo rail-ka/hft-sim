@@ -11,7 +11,7 @@ mod stage2;
 mod strategy;
 mod traits;
 mod types;
-mod utils;
+// mod utils;
 
 #[macro_use]
 extern crate tracing;
@@ -48,7 +48,6 @@ fn main() -> eyre::Result<()> {
     let args: Args = argh::from_env();
 
     let config = config::Config::init(args.config.canonicalize()?)?;
-    info!("Loaded config for scenario: {}", config.scenario);
 
     match args.mode {
         Mode::Queue => queue::run(config)?,

@@ -4,7 +4,6 @@ use quanta::Clock;
 use crate::{
     config::Stage2Rule,
     types::{HandledMessage, Message},
-    utils::timestamp,
 };
 
 pub type ProcessorReceiver = Receiver<Message>;
@@ -16,6 +15,8 @@ pub struct ProcessorWorker {
     pub receiver: ProcessorReceiver,
     pub strategies: Vec<StrategySender>,
     pub stage2_rules: Vec<Stage2Rule>,
+    pub start_ts: u64,
+    pub clock: Clock,
 }
 
 impl ProcessorWorker {
@@ -26,10 +27,10 @@ impl ProcessorWorker {
             strategies,
             receiver,
             stage2_rules,
+            start_ts,
+            clock,
         } = self;
         let fmt = human_format::Formatter::new();
-        let mut ts = timestamp();
-        let clock = Clock::new();
         let mut err_arr = [[0u64; 8]; 8];
 
         let mut prev = clock.raw();
@@ -58,12 +59,12 @@ impl ProcessorWorker {
                 delta = clock.delta_as_nanos(prev, raw);
             }
             prev = raw;
-            ts += delta;
+            let timestamp = clock.delta_as_nanos(start_ts, clock.raw());
 
             let res = strategy_sender.try_send(HandledMessage {
                 msg,
                 processor_id: id,
-                processing_ts: ts,
+                processing_ts: timestamp,
             });
             if res.is_err() {
                 err_arr[msg.ty as usize][strategy as usize] += 1;

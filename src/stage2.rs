@@ -5,6 +5,7 @@ use crate::{
 
 pub struct Stage2 {
     pub stage2_rules: Vec<Stage2Rule>,
+    // pub receivers: Vec<Receiver>,
 }
 
 impl Stage2 {

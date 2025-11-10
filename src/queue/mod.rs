@@ -4,10 +4,13 @@ use std::{
         atomic::{AtomicU64, Ordering},
     },
     thread,
+    time::Duration,
 };
 
 use crossbeam_channel::bounded;
+use hdrhistogram::{Histogram, SyncHistogram};
 use itertools::Itertools;
+use quanta::Clock;
 
 use crate::{
     config::Config, processor::ProcessorWorker, producer::ProducerWorker, stage1::Stage1,
@@ -29,6 +32,11 @@ pub fn run(config: Config) -> eyre::Result<()> {
     debug!(?core_ids);
     core_ids.reverse();
 
+    let p_histogram = Histogram::<u64>::new_with_bounds(100, 10_000_000, 3).unwrap();
+    let mut p_histogram = SyncHistogram::from(p_histogram);
+    let c_histogram = Histogram::<u64>::new_with_bounds(100, 10_000_000, 3).unwrap();
+    let mut c_histogram = SyncHistogram::from(c_histogram);
+
     let zero_messages_counts = Arc::new(AtomicU64::new(0));
     let handled_zero_messages_counts = Arc::new(AtomicU64::new(0));
 
@@ -36,6 +44,10 @@ pub fn run(config: Config) -> eyre::Result<()> {
     let mut processors_handles = Vec::with_capacity(c_processors.count as usize);
     let mut strategies_handles = Vec::with_capacity(c_strategies.count as usize);
     let mut strategies_queues = Vec::with_capacity(c_strategies.count as usize);
+
+    let clock = Clock::new();
+    // let start_ts = crate::utils::timestamp();
+    let start_ts = clock.raw();
 
     let strategies_iter = c_strategies
         .processing_times_ns
@@ -60,6 +72,10 @@ pub fn run(config: Config) -> eyre::Result<()> {
             receiver: r,
             processing_time: v,
             handled_zero_messages_counts: handled_zero_messages_counts.clone(),
+            start_ts,
+            clock: clock.clone(),
+            p_histogram: p_histogram.recorder(),
+            c_histogram: c_histogram.recorder(),
         };
         let cid = core_ids.pop();
         let handle = thread::Builder::new()
@@ -100,6 +116,8 @@ pub fn run(config: Config) -> eyre::Result<()> {
             strategies: strategies_queues.clone(),
             receiver: r,
             stage2_rules: stage2_rules.clone(),
+            start_ts,
+            clock: clock.clone(),
         };
         let cid = core_ids.pop();
         let handle = thread::Builder::new()
@@ -138,6 +156,8 @@ pub fn run(config: Config) -> eyre::Result<()> {
             burst_pattern: c_producers.burst_pattern.clone(),
             zero_messages_counts: zero_messages_counts.clone(),
             stage1: stage1.clone(),
+            start_ts,
+            clock: clock.clone(),
         };
         let cid = core_ids.pop();
         let handle = thread::Builder::new()
@@ -155,6 +175,24 @@ pub fn run(config: Config) -> eyre::Result<()> {
         producers_handles.push(handle);
     }
     drop(stage1);
+
+    for sec in 0..config.duration_secs {
+        std::thread::sleep(Duration::from_secs(1));
+        p_histogram.refresh();
+        c_histogram.refresh();
+        let p50 = (p_histogram.value_at_quantile(0.5) as f64) / 1000.00;
+        let p90 = (p_histogram.value_at_quantile(0.9) as f64) / 1000.00;
+        let p99 = (p_histogram.value_at_quantile(0.99) as f64) / 1000.00;
+        let p999 = (p_histogram.value_at_quantile(0.999) as f64) / 1000.00;
+        let max = (p_histogram.max() as f64) / 1000.00;
+        info!(sec, p50, p90, p99, p999, max, "process");
+        let p50 = (c_histogram.value_at_quantile(0.5) as f64) / 1000.00;
+        let p90 = (c_histogram.value_at_quantile(0.9) as f64) / 1000.00;
+        let p99 = (c_histogram.value_at_quantile(0.99) as f64) / 1000.00;
+        let p999 = (c_histogram.value_at_quantile(0.999) as f64) / 1000.00;
+        let max = (c_histogram.max() as f64) / 1000.00;
+        info!(sec, p50, p90, p99, p999, max, "stage");
+    }
 
     for j in producers_handles {
         j.join().unwrap();
