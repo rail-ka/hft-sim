@@ -28,9 +28,10 @@ impl Stage1 {
         if rule.len() == 1 {
             return rule.first().unwrap().try_send(msg).is_ok();
         }
+        // не документировано, что может быть несколько, но в конфиге массив processors
         let index = (msg.producer_id as usize) % rule.len();
         rule[index].try_send(msg).is_ok()
-        // TODO: if we need balancing (but not ordering reguired):
+        // TODO: if we need balancing (but not ordering reguired!):
         // rule.iter()
         //     .min_by_key(|q| q.len())
         //     .unwrap()

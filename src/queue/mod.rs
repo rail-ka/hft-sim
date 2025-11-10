@@ -13,9 +13,16 @@ use itertools::Itertools;
 use quanta::Clock;
 
 use crate::{
-    config::Config, processor::ProcessorWorker, producer::ProducerWorker, stage1::Stage1,
-    strategy::StrategyWorker, traits::QueueProcessorSender,
+    config::Config,
+    processor::ProcessorWorker,
+    producer::ProducerWorker,
+    queue::{stage1::Stage1, traits::QueueProcessorSender},
+    strategy::StrategyWorker,
 };
+
+pub mod stage1;
+pub mod stage2;
+pub mod traits;
 
 pub fn run(config: Config) -> eyre::Result<()> {
     let Config {

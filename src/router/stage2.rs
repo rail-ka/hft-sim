@@ -6,6 +6,7 @@ use crate::{
     types::HandledMessage,
 };
 
+use core_affinity::CoreId;
 // use ringbuf::{
 //     HeapRb,
 //     traits::{Consumer as RConsumer, Observer, Split},
@@ -42,10 +43,16 @@ impl Stage2 {
         (s, strategy_cons, processor_prod)
     }
 
-    pub fn run(self) -> JoinHandle<()> {
+    pub fn run(self, core_id: Option<CoreId>) -> JoinHandle<()> {
         thread::Builder::new()
             .name("stage2".to_string())
-            .spawn(|| {
+            .spawn(move || {
+                if let Some(cid) = core_id {
+                    let res = core_affinity::set_for_current(cid);
+                    if !res {
+                        warn!("cannot pin {cid:?} thread for stage2");
+                    }
+                }
                 let Self {
                     mut processor_cons,
                     mut strategy_prod,

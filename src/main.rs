@@ -8,8 +8,6 @@ mod processor;
 mod producer;
 mod queue;
 mod router;
-mod stage1;
-mod stage2;
 mod strategy;
 mod traits;
 mod types;

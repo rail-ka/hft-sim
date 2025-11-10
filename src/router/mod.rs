@@ -7,15 +7,21 @@ use std::{
     time::Duration,
 };
 
-use crossbeam_channel::bounded;
 use hdrhistogram::{Histogram, SyncHistogram};
 use itertools::Itertools;
 use quanta::Clock;
 
 use crate::{
-    config::Config, processor::ProcessorWorker, producer::ProducerWorker, stage1::Stage1,
-    stage2::Stage2, strategy::StrategyWorker,
+    config::Config,
+    processor::ProcessorWorker,
+    producer::ProducerWorker,
+    router::{stage1::Stage1, stage2::Stage2},
+    strategy::StrategyWorker,
 };
+
+pub mod stage1;
+pub mod stage2;
+pub mod traits;
 
 pub fn run(config: Config) -> eyre::Result<()> {
     let Config {
@@ -24,7 +30,7 @@ pub fn run(config: Config) -> eyre::Result<()> {
         producers: c_producers,
         processors: c_processors,
         strategies: c_strategies,
-        stage1_rules,
+        stage1_rules: _,
         stage2_rules: _,
     } = config.clone();
 
@@ -45,7 +51,6 @@ pub fn run(config: Config) -> eyre::Result<()> {
     let mut strategies_handles = Vec::with_capacity(c_strategies.count as usize);
 
     let clock = Clock::new();
-    // let start_ts = crate::utils::timestamp();
     let start_ts = clock.raw();
 
     let strategies_iter = c_strategies
@@ -60,11 +65,10 @@ pub fn run(config: Config) -> eyre::Result<()> {
         .collect_vec();
     debug!(?strategies_iter);
 
-    let (stage2, cons, prod) = Stage2::new(&config);
+    let (stage2, strategies_cons, processors_prod) = Stage2::new(&config);
+    let stage2_handle = stage2.run(core_ids.pop());
 
-    let strategies_iter = strategies_iter.into_iter().zip(cons);
-
-    let handle = stage2.run();
+    let strategies_iter = strategies_iter.into_iter().zip(strategies_cons);
 
     for ((index, (id, v)), cons) in strategies_iter {
         assert_eq!(id, index as u64);
@@ -104,17 +108,16 @@ pub fn run(config: Config) -> eyre::Result<()> {
         .sorted_unstable_by_key(|(id, _)| *id)
         .collect::<Vec<_>>();
 
-    let mut processors_queues = Vec::with_capacity(c_processors.count as usize);
+    let (stage1, processors_cons, producers_prod) = Stage1::new(&config);
+    let stage1_handle = stage1.run(core_ids.pop());
 
-    const PROCESSORS_QUEUE_CAP: usize = 20_000_000;
+    let iter = processors_prod.into_iter().zip(processors_cons).enumerate();
 
-    for (id, sender) in prod.into_iter().enumerate() {
-        let (s, r) = bounded(PROCESSORS_QUEUE_CAP);
-        processors_queues.push(s);
+    for (id, (sender, receiver)) in iter {
         let worker = ProcessorWorker {
             id: id as u64,
             processing_times: processors_processing_times.clone(),
-            receiver: r,
+            receiver,
             start_ts,
             clock: clock.clone(),
             sender,
@@ -144,17 +147,15 @@ pub fn run(config: Config) -> eyre::Result<()> {
         })
         .collect::<Vec<_>>();
 
-    let stage1 = Stage1::new(processors_queues, stage1_rules);
-
-    for i in 0..c_producers.count {
+    for (i, prod) in producers_prod.into_iter().enumerate() {
         let worker = ProducerWorker {
-            id: i,
+            id: i as u64,
             duration_secs,
             messages_per_sec: c_producers.messages_per_sec,
             distribution: distribution.clone(),
             burst_pattern: c_producers.burst_pattern.clone(),
             zero_messages_counts: zero_messages_counts.clone(),
-            stage1: stage1.clone(),
+            stage1: prod,
             start_ts,
             clock: clock.clone(),
         };
@@ -173,7 +174,6 @@ pub fn run(config: Config) -> eyre::Result<()> {
             .unwrap();
         producers_handles.push(handle);
     }
-    drop(stage1);
 
     let mut print_histogram = || {
         p_histogram.refresh();
@@ -207,7 +207,8 @@ pub fn run(config: Config) -> eyre::Result<()> {
     for j in strategies_handles {
         j.join().unwrap();
     }
-    handle.join().unwrap();
+    stage1_handle.join().unwrap();
+    stage2_handle.join().unwrap();
 
     print_histogram();
 

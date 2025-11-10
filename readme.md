@@ -34,7 +34,13 @@ stage1 будет принимать сообщения от producer и отп�
 stage2 будет принимать сообщения от processor, валидировать сортировку/очередность, отправлять strategy.
 
 для stage2 какая будет матрица?
-- для каждого producer будет создана SPSC. например 4.
+- для каждого processor будет создана SPSC. например 4.
 - для каждого strategy тоже свой SPSC: 3.
-- stage2 хранит producers: Vec<Receiver>, strategies: Vec<Sender>
+- stage2 хранит processors: Vec<Receiver>, strategies: Vec<Sender>
+- мониторит все `Vec<Receiver>` в цикле
+
+для stage1 какая будет матрица?
+- для каждого producer будет создана SPSC. например 4.
+- для каждого processor будет создана SPSC. например 4.
+- stage1 хранит producer: Vec<Sender>, processor: Vec<Receiver>
 - мониторит все `Vec<Receiver>` в цикле

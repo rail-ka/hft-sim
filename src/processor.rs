@@ -1,28 +1,25 @@
-use crossbeam_channel::Receiver;
 use quanta::Clock;
 
 use crate::{
-    traits::ProcessorSender,
-    types::{HandledMessage, Message},
+    traits::{ProcessorReceiver, ProcessorSender},
+    types::HandledMessage,
 };
 
-pub type ProcessorReceiver = Receiver<Message>;
-
-pub struct ProcessorWorker<S: ProcessorSender> {
+pub struct ProcessorWorker<S, R> {
     pub id: u64,
     pub processing_times: Vec<(u64, u64)>,
-    pub receiver: ProcessorReceiver,
+    pub receiver: R,
     pub sender: S,
     pub start_ts: u64,
     pub clock: Clock,
 }
 
-impl<S: ProcessorSender> ProcessorWorker<S> {
+impl<S: ProcessorSender, R: ProcessorReceiver> ProcessorWorker<S, R> {
     pub fn run(self) {
         let ProcessorWorker {
             id,
             processing_times,
-            receiver,
+            mut receiver,
             mut sender,
             start_ts,
             clock,
@@ -35,7 +32,7 @@ impl<S: ProcessorSender> ProcessorWorker<S> {
         let mut total_msg = 0usize;
         let mut nanos_per_sec = 0u64;
 
-        while let Ok(msg) = receiver.recv() {
+        while let Some(msg) = receiver.next() {
             let msg_ty = msg.ty;
             let processing_time = processing_times
                 .iter()
