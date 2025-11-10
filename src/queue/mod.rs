@@ -127,37 +127,6 @@ pub fn run(config: Config) -> eyre::Result<()> {
     }
     drop(strategies_queues);
 
-    // let mut stage1_queues = stage1_rules
-    //     .into_iter()
-    //     .map(|rule| {
-    //         let processors = rule
-    //             .processors
-    //             .into_iter()
-    //             .map(|id| {
-    //                 let queue = ArrayQueue::<Message>::new(512 * 512);
-    //                 ProcessorIdQueue { id, queue }
-    //             })
-    //             .collect();
-    //         Stage1Item {
-    //             msg_type: rule.msg_type,
-    //             processors,
-    //         }
-    //     })
-    //     .collect::<Vec<_>>();
-    // let mut stage2_queues = stage2_rules
-    //     .into_iter()
-    //     .map(|rule| {
-    //         rule.strategy;
-    //         rule.msg_type;
-    //         rule.ordering_required;
-    //         let queue = ArrayQueue::<HandledMesage>::new(512 * 512);
-    //         queue
-    //     })
-    //     .collect::<Vec<_>>();
-
-    // let stage1 = Stage1 { rules: Vec::new() };
-    // let stage1 = Arc::new(stage1);
-
     let distribution = c_producers
         .distribution
         .into_iter()
@@ -170,7 +139,6 @@ pub fn run(config: Config) -> eyre::Result<()> {
     let processors_queues = Arc::new(processors_queues);
 
     for i in 0..c_producers.count {
-        // let stage = stage1.clone();
         let worker = ProducerWorker {
             id: i,
             duration_secs,

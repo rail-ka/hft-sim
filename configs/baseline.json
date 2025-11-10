@@ -3,7 +3,7 @@
   "duration_secs": 10,
   "producers": {
     "count": 4,
-    "messages_per_sec": 10000000,
+    "messages_per_sec": 8000000,
     "distribution": {
       "msg_type_0": 0.25,
       "msg_type_1": 0.25,
@@ -31,19 +31,19 @@
   "stage1_rules": [
     {
       "msg_type": 0,
-      "processors": [0, 1]
+      "processors": [0]
     },
     {
       "msg_type": 1,
-      "processors": [1, 2]
+      "processors": [1]
     },
     {
       "msg_type": 2,
-      "processors": [2, 3]
+      "processors": [2]
     },
     {
       "msg_type": 3,
-      "processors": [3, 0]
+      "processors": [3]
     }
   ],
   "stage2_rules": [

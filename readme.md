@@ -15,7 +15,7 @@ commands:
 
 ```bash
 cargo build --profile profiling
-samply record ./target/profiling/hft /Users/railka/lab/rust/hft/configs/baseline.json
+samply record ./target/profiling/hft /Users/railka/lab/rust/hft/configs/baseline.json --mode queue
 ```
 
 ## Stage threads
