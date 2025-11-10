@@ -10,7 +10,8 @@ use crossbeam_channel::bounded;
 use itertools::Itertools;
 
 use crate::{
-    config::Config, processor::ProcessorWorker, producer::ProducerWorker, strategy::StrategyWorker,
+    config::Config, processor::ProcessorWorker, producer::ProducerWorker, stage1::Stage1,
+    strategy::StrategyWorker,
 };
 
 pub fn run(config: Config) -> eyre::Result<()> {
@@ -53,7 +54,6 @@ pub fn run(config: Config) -> eyre::Result<()> {
     for (index, (id, v)) in strategies_iter {
         assert_eq!(id, index as u64);
         let (s, r) = bounded(STRATEGIES_QUEUE_CAP);
-        // let (s, r) = unbounded();
         strategies_queues.push(s);
         let worker = StrategyWorker {
             id,
@@ -89,13 +89,10 @@ pub fn run(config: Config) -> eyre::Result<()> {
 
     let mut processors_queues = Vec::with_capacity(c_processors.count as usize);
 
-    let strategies_queues = Arc::new(strategies_queues);
-
     const PROCESSORS_QUEUE_CAP: usize = 20_000_000;
 
     for id in 0..c_processors.count {
         let (s, r) = bounded(PROCESSORS_QUEUE_CAP);
-        // let (s, r) = unbounded();
         processors_queues.push(s);
         let worker = ProcessorWorker {
             id,
@@ -130,7 +127,7 @@ pub fn run(config: Config) -> eyre::Result<()> {
         })
         .collect::<Vec<_>>();
 
-    let processors_queues = Arc::new(processors_queues);
+    let stage1 = Stage1::new(processors_queues, stage1_rules);
 
     for i in 0..c_producers.count {
         let worker = ProducerWorker {
@@ -139,9 +136,8 @@ pub fn run(config: Config) -> eyre::Result<()> {
             messages_per_sec: c_producers.messages_per_sec,
             distribution: distribution.clone(),
             burst_pattern: c_producers.burst_pattern.clone(),
-            processors: processors_queues.clone(),
-            stage1_rules: stage1_rules.clone(),
             zero_messages_counts: zero_messages_counts.clone(),
+            stage1: stage1.clone(),
         };
         let cid = core_ids.pop();
         let handle = thread::Builder::new()
@@ -158,7 +154,7 @@ pub fn run(config: Config) -> eyre::Result<()> {
             .unwrap();
         producers_handles.push(handle);
     }
-    drop(processors_queues);
+    drop(stage1);
 
     for j in producers_handles {
         j.join().unwrap();

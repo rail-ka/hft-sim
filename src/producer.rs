@@ -3,16 +3,11 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
-use crossbeam_channel::Sender;
 use itertools::Itertools;
 use quanta::Clock;
 use rand::{rng, seq::SliceRandom};
 
-use crate::{
-    config::{Phase, Stage1Rule},
-    types::Message,
-    utils::timestamp,
-};
+use crate::{config::Phase, stage1::Stage1, types::Message, utils::timestamp};
 
 pub struct ProducerWorker {
     pub id: u64,
@@ -20,8 +15,7 @@ pub struct ProducerWorker {
     pub messages_per_sec: u64,
     pub distribution: Vec<(u64, f64)>,
     pub burst_pattern: Option<Vec<Phase>>,
-    pub processors: Arc<Vec<Sender<Message>>>,
-    pub stage1_rules: Vec<Stage1Rule>,
+    pub stage1: Stage1,
     pub zero_messages_counts: Arc<AtomicU64>,
 }
 
@@ -33,8 +27,7 @@ impl ProducerWorker {
             messages_per_sec,
             mut distribution,
             burst_pattern,
-            processors,
-            stage1_rules,
+            stage1: senders,
             zero_messages_counts,
         } = self;
         let fmt = human_format::Formatter::new();
@@ -51,18 +44,12 @@ impl ProducerWorker {
         info!("distribution_pattern: {distribution_pattern:?}");
         let mut distribution_pattern = distribution_pattern.into_iter().cycle();
 
-        let mut err_arr = [[0u64; 8]; 8];
+        let mut err_arr = [0u64; 8];
 
         let mut total_msg = 0usize;
         let mut total_zero_msgs = 0u64;
         // let mut wait_cycles = 0u64;
         let mut iter = 0u64;
-
-        let mut msg_routes = stage1_rules
-            .into_iter()
-            .sorted_by_key(|i| i.msg_type)
-            .map(|i| i.processors.into_iter().cycle())
-            .collect_vec();
 
         let mut closure = |duration_ms: u64, msg_per_ms: u64, nano_per_msg: u64| {
             for ms in 0..duration_ms {
@@ -80,10 +67,9 @@ impl ProducerWorker {
                     msg.seq += 1;
                     msg.ty = msg_type;
                     msg.timestamp += delta;
-                    let processor_id: u64 = msg_routes[msg_type as usize].next().unwrap();
-                    let res = processors[processor_id as usize].try_send(msg);
-                    if res.is_err() {
-                        err_arr[msg_type as usize][processor_id as usize] += 1;
+                    let res = senders.send(msg);
+                    if !res {
+                        err_arr[msg_type as usize] += 1;
                     } else {
                         total_msg += 1;
                         if msg_type == 0 {
@@ -137,11 +123,9 @@ impl ProducerWorker {
             }
         }
 
-        for (ty, inner) in err_arr.iter().enumerate() {
-            for (processor, count) in inner.iter().enumerate() {
-                if *count != 0 {
-                    error!(ty, processor, "{}", fmt.format(*count as f64));
-                }
+        for (ty, count) in err_arr.iter().enumerate() {
+            if *count != 0 {
+                error!(ty, "{}", fmt.format(*count as f64));
             }
         }
         zero_messages_counts.fetch_add(total_zero_msgs, Ordering::SeqCst);

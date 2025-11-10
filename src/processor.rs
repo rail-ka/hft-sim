@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crossbeam_channel::{Receiver, Sender};
 use quanta::Clock;
 
@@ -10,13 +8,13 @@ use crate::{
 };
 
 pub type ProcessorReceiver = Receiver<Message>;
-pub type SrategySender = Sender<HandledMessage>;
+pub type StrategySender = Sender<HandledMessage>;
 
 pub struct ProcessorWorker {
     pub id: u64,
     pub processing_times: Vec<(u64, u64)>,
     pub receiver: ProcessorReceiver,
-    pub strategies: Arc<Vec<SrategySender>>,
+    pub strategies: Vec<StrategySender>,
     pub stage2_rules: Vec<Stage2Rule>,
 }
 

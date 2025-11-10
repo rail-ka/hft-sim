@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+  # Базовый сервис для сборки и общих настроек
+  router:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hft-app
+    # Монтируем директорию для вывода результатов
+    volumes:
+      - ./results:/app/results
+      - ./configs:/app/configs
+    # Для высокопроизводительных приложений рекомендуется использовать сеть хоста
+    network_mode: "host"
+    ipc: "host"
+    # Предоставляем расширенные права для управления приоритетами и привязкой к CPU
+    cap_add:
+      - SYS_NICE
+    ulimits:
+      memlock: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    # Привязка к CPU может быть настроена здесь для лучшей производительности
+    # cpuset: "0-3"
+
+  # Сервис для запуска тестов по сценариям
+  router-test:
+    extends:
+      service: router
+    # Команда по умолчанию. Пользователь может переопределить ее,
+    # например: docker-compose run router-test configs/baseline.json
+    command: >
+      sh -c "
+        echo 'Running all test scenarios...' &&
+        hft configs/baseline.json &&
+        hft configs/hot_type.json &&
+        hft configs/burst_pattern.json &&
+        hft configs/imbalanced_processing.json &&
+        hft configs/ordering_stress.json &&
+        hft configs/strategy_bottleneck.json
+      "
+
+  # Сервис для запуска бенчмарков
+  router-benchmark:
+    extends:
+      service: router
+    # Укажите здесь команду для запуска бенчмарков
+    # Например: hft --benchmark all
+    command:
+      [
+        "echo",
+        "Please specify a benchmark to run, e.g., docker-compose run router-benchmark -- --bench queue_perf",
+      ]
