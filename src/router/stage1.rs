@@ -18,10 +18,10 @@ pub struct Stage1 {
 impl Stage1 {
     pub fn new(config: &Config) -> (Self, Arr<Consumer<Message>>, Arr<Producer<Message>>) {
         let (producer_prod, producer_cons): (Arr<_>, Arr<_>) = (0..config.producers.count)
-            .map(|_| RingBuffer::<Message>::new(10_000_000))
+            .map(|_| RingBuffer::<Message>::new(4_000_000))
             .unzip();
         let (processor_prod, processor_cons): (Arr<_>, Arr<_>) = (0..config.processors.count)
-            .map(|_| RingBuffer::<Message>::new(10_000_000))
+            .map(|_| RingBuffer::<Message>::new(4_000_000))
             .unzip();
         let s = Self {
             stage1_rules: config.stage1_rules.iter().cloned().collect(),
@@ -33,12 +33,12 @@ impl Stage1 {
 
     pub fn run(self, core_id: Option<CoreId>) -> JoinHandle<()> {
         thread::Builder::new()
-            .name("stage2".to_string())
+            .name("stage1".to_string())
             .spawn(move || {
                 if let Some(cid) = core_id {
                     let res = core_affinity::set_for_current(cid);
                     if !res {
-                        warn!("cannot pin {cid:?} thread for stage2");
+                        warn!("cannot pin {cid:?} thread for stage1");
                     }
                 }
                 let Self {
@@ -50,13 +50,14 @@ impl Stage1 {
                 'a: loop {
                     let iter = producer_cons.iter_mut();
                     for cons in iter {
-                        if cons.is_abandoned() {
-                            len -= 1;
-                            if len == 0 {
-                                break 'a;
-                            }
-                        }
                         if cons.is_empty() {
+                            if cons.is_abandoned() {
+                                std::sync::atomic::fence(std::sync::atomic::Ordering::Acquire);
+                                len -= 1;
+                                if len == 0 {
+                                    break 'a;
+                                }
+                            }
                             continue;
                         }
                         let slots = cons.slots();

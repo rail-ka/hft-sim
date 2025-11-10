@@ -5,19 +5,21 @@ use crate::{
 
 impl StrategyReceiver for rtrb::Consumer<HandledMessage> {
     fn next(&mut self) -> Option<HandledMessage> {
-        if self.is_abandoned() {
-            info!("StrategyReceiver stopped");
-            return None;
-        }
+        // if self.is_empty() && self.is_abandoned() {
+        //     std::sync::atomic::fence(std::sync::atomic::Ordering::Acquire);
+        //     info!("StrategyReceiver stopped");
+        //     return None;
+        // }
         let mut count = 0;
         loop {
-            if count > 1000 && self.is_abandoned() {
-                info!("StrategyReceiver stopped");
-                return None;
-            }
             count += 1;
             if !self.is_empty() {
                 break;
+            }
+            if count > 1000 && self.is_abandoned() {
+                std::sync::atomic::fence(std::sync::atomic::Ordering::Acquire);
+                info!("StrategyReceiver stopped");
+                return None;
             }
         }
         let msg = self.pop().unwrap();
@@ -31,19 +33,21 @@ impl StrategyReceiver for rtrb::Consumer<HandledMessage> {
 
 impl ProcessorReceiver for rtrb::Consumer<Message> {
     fn next(&mut self) -> Option<Message> {
-        if self.is_abandoned() {
-            info!("ProcessorReceiver stopped");
-            return None;
-        }
+        // if self.is_empty() && self.is_abandoned() {
+        //     std::sync::atomic::fence(std::sync::atomic::Ordering::Acquire);
+        //     info!("ProcessorReceiver stopped");
+        //     return None;
+        // }
         let mut count = 0;
         loop {
-            if count > 1000 && self.is_abandoned() {
-                info!("ProcessorReceiver stopped");
-                return None;
-            }
             count += 1;
             if !self.is_empty() {
                 break;
+            }
+            if count > 1000 && self.is_abandoned() {
+                std::sync::atomic::fence(std::sync::atomic::Ordering::Acquire);
+                info!("ProcessorReceiver stopped");
+                return None;
             }
         }
         let msg = self.pop().unwrap();

@@ -32,7 +32,7 @@ impl Stage2 {
             .unzip();
 
         let (processor_prod, processor_cons): (Arr<_>, Arr<_>) = (0..config.processors.count)
-            .map(|_| RingBuffer::<HandledMessage>::new(10_000_000))
+            .map(|_| RingBuffer::<HandledMessage>::new(4_000_000))
             .unzip();
 
         let s = Self {
@@ -63,13 +63,14 @@ impl Stage2 {
                 'a: loop {
                     let iter = processor_cons.iter_mut();
                     for cons in iter {
-                        if cons.is_abandoned() {
-                            len -= 1;
-                            if len == 0 {
-                                break 'a;
-                            }
-                        }
                         if cons.is_empty() {
+                            if cons.is_abandoned() {
+                                std::sync::atomic::fence(std::sync::atomic::Ordering::Acquire);
+                                len -= 1;
+                                if len == 0 {
+                                    break 'a;
+                                }
+                            }
                             continue;
                         }
                         let slots = cons.slots();
