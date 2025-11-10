@@ -30,26 +30,23 @@ services:
     extends:
       service: router
     # Команда по умолчанию. Пользователь может переопределить ее,
-    # например: docker-compose run router-test configs/baseline.json
+    # например: docker-compose run router-test ./run_test.sh configs/baseline.json
     command: >
       sh -c "
         echo 'Running all test scenarios...' &&
-        hft configs/baseline.json &&
-        hft configs/hot_type.json &&
-        hft configs/burst_pattern.json &&
-        hft configs/imbalanced_processing.json &&
-        hft configs/ordering_stress.json &&
-        hft configs/strategy_bottleneck.json
+        ./run_test.sh configs/baseline.json &&
+        ./run_test.sh configs/hot_type.json &&
+        ./run_test.sh configs/burst_pattern.json &&
+        ./run_test.sh configs/imbalanced_processing.json &&
+        ./run_test.sh configs/ordering_stress.json &&
+        ./run_test.sh configs/strategy_bottleneck.json
       "
 
   # Сервис для запуска бенчмарков
   router-benchmark:
     extends:
       service: router
-    # Укажите здесь команду для запуска бенчмарков
-    # Например: hft --benchmark all
-    command:
-      [
-        "echo",
-        "Please specify a benchmark to run, e.g., docker-compose run router-benchmark -- --bench queue_perf",
-      ]
+    # Команда по умолчанию для запуска бенчмарков с аргументами
+    command: ["./run_benchmark.sh"]
+    # If no arguments provided, show usage
+    # Example: docker-compose run router-benchmark queue_perf
