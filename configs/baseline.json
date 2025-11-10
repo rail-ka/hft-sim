@@ -1,71 +1,71 @@
 {
-  "scenario": "baseline",
-  "duration_secs": 10,
-  "producers": {
-    "count": 4,
-    "messages_per_sec": 8000000,
-    "distribution": {
-      "msg_type_0": 0.25,
-      "msg_type_1": 0.25,
-      "msg_type_2": 0.25,
-      "msg_type_3": 0.25
-    }
-  },
-  "processors": {
-    "count": 4,
-    "processing_times_ns": {
-      "msg_type_0": 10,
-      "msg_type_1": 10,
-      "msg_type_2": 10,
-      "msg_type_3": 10
-    }
-  },
-  "strategies": {
-    "count": 3,
-    "processing_times_ns": {
-      "strategy_0": 10,
-      "strategy_1": 10,
-      "strategy_2": 10
-    }
-  },
-  "stage1_rules": [
-    {
-      "msg_type": 0,
-      "processors": [0]
+    "scenario": "baseline",
+    "duration_secs": 10,
+    "producers": {
+        "count": 4,
+        "messages_per_sec": 2000000,
+        "distribution": {
+            "msg_type_0": 0.25,
+            "msg_type_1": 0.25,
+            "msg_type_2": 0.25,
+            "msg_type_3": 0.25
+        }
     },
-    {
-      "msg_type": 1,
-      "processors": [1]
+    "processors": {
+        "count": 4,
+        "processing_times_ns": {
+            "msg_type_0": 20,
+            "msg_type_1": 20,
+            "msg_type_2": 20,
+            "msg_type_3": 20
+        }
     },
-    {
-      "msg_type": 2,
-      "processors": [2]
+    "strategies": {
+        "count": 3,
+        "processing_times_ns": {
+            "strategy_0": 20,
+            "strategy_1": 20,
+            "strategy_2": 20
+        }
     },
-    {
-      "msg_type": 3,
-      "processors": [3]
-    }
-  ],
-  "stage2_rules": [
-    {
-      "msg_type": 0,
-      "strategy": 0,
-      "ordering_required": true
-    },
-    {
-      "msg_type": 1,
-      "strategy": 1,
-      "ordering_required": true
-    },
-    {
-      "msg_type": 2,
-      "strategy": 2,
-      "ordering_required": true
-    },
-    {
-      "msg_type": 3,
-      "strategy": 0,
-      "ordering_required": true
-    }
-  ]
+    "stage1_rules": [
+        {
+            "msg_type": 0,
+            "processors": [0]
+        },
+        {
+            "msg_type": 1,
+            "processors": [1]
+        },
+        {
+            "msg_type": 2,
+            "processors": [2]
+        },
+        {
+            "msg_type": 3,
+            "processors": [3]
+        }
+    ],
+    "stage2_rules": [
+        {
+            "msg_type": 0,
+            "strategy": 0,
+            "ordering_required": true
+        },
+        {
+            "msg_type": 1,
+            "strategy": 1,
+            "ordering_required": true
+        },
+        {
+            "msg_type": 2,
+            "strategy": 2,
+            "ordering_required": true
+        },
+        {
+            "msg_type": 3,
+            "strategy": 0,
+            "ordering_required": true
+        }
+    ]
 }

@@ -5,7 +5,7 @@ use std::sync::{
 
 use eyre::bail;
 use itertools::Itertools;
-use kanal::Receiver;
+use crossbeam_channel::Receiver;
 use quanta::Clock;
 
 use crate::{

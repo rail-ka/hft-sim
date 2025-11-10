@@ -3,9 +3,8 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
-// use crossbeam_channel::Sender;
+use crossbeam_channel::Sender;
 use itertools::Itertools;
-use kanal::Sender;
 use quanta::Clock;
 use rand::{rng, seq::SliceRandom};
 

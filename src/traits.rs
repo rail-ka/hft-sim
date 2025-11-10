@@ -1,4 +1,4 @@
-use kanal::Sender;
+use crossbeam_channel::Sender;
 
 use crate::types::{HandledMessage, Message};
 

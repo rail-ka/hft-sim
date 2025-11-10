@@ -27,13 +27,13 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
 pprof = { version = "0.15", default-features = false, features = ["flamegraph"] }
 
 crossbeam-channel = "0.5"
-kanal = { version = "0.1", default-features = false }
 rtrb = "0.3"
 ringbuf = "0.4"
 disruptor = "3.6"
 
 [profile.release]
 lto = true
+# target-feature="+aes,+avx,+avx2,+avx512f,+fma,+sha,+sse,+sse2,+sse3,+sse4.1,+sse4.2,+sse4a,+ssse3"
 
 [profile.profiling]
 inherits = "release"

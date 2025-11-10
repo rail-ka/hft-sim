@@ -8,7 +8,7 @@ use std::{
 
 use eyre::bail;
 use itertools::Itertools;
-use kanal::bounded;
+use crossbeam_channel::bounded;
 
 use crate::{
     config::Config, processor::ProcessorWorker, producer::ProducerWorker, strategy::StrategyWorker,
@@ -54,7 +54,7 @@ pub fn run(config: Config) -> eyre::Result<()> {
         .collect_vec();
     debug!(?strategies_iter);
 
-    const STRATEGIES_QUEUE_CAP: usize = 40_000_000;
+    const STRATEGIES_QUEUE_CAP: usize = 30_000_000;
 
     for (index, (id, v)) in strategies_iter {
         assert_eq!(id, index as u64);
@@ -97,7 +97,7 @@ pub fn run(config: Config) -> eyre::Result<()> {
 
     let strategies_queues = Arc::new(strategies_queues);
 
-    const PROCESSORS_QUEUE_CAP: usize = 40_000_000;
+    const PROCESSORS_QUEUE_CAP: usize = 20_000_000;
 
     for id in 0..c_processors.count {
         let (s, r) = bounded(PROCESSORS_QUEUE_CAP);
