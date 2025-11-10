@@ -9,7 +9,7 @@ pub struct Message {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-pub struct HandledMesage {
+pub struct HandledMessage {
     pub msg: Message,
     pub processor_id: u64,
     pub processing_ts: u64,

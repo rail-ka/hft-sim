@@ -6,12 +6,12 @@ use quanta::Clock;
 
 use crate::{
     config::Stage2Rule,
-    types::{HandledMesage, Message},
+    types::{HandledMessage, Message},
     utils::timestamp,
 };
 
 pub type ProcessorReceiver = Receiver<Message>;
-pub type SrategySender = Sender<HandledMesage>;
+pub type SrategySender = Sender<HandledMessage>;
 
 pub struct ProcessorWorker {
     pub id: u64,
@@ -64,7 +64,7 @@ impl ProcessorWorker {
             prev = raw;
             ts += delta;
 
-            let res = strategy_sender.try_send(HandledMesage {
+            let res = strategy_sender.try_send(HandledMessage {
                 msg,
                 processor_id: id,
                 processing_ts: ts,

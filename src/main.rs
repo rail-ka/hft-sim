@@ -10,6 +10,7 @@ mod router;
 mod stage1;
 mod stage2;
 mod strategy;
+mod traits;
 mod types;
 mod utils;
 
@@ -19,8 +20,8 @@ extern crate tracing;
 #[derive(argh::FromArgs)]
 /// Args
 struct Args {
-    /// how high to go
-    #[argh(option)]
+    /// config path
+    #[argh(positional)]
     config: PathBuf,
 
     /// mode: queue, router, lmax
@@ -29,6 +30,7 @@ struct Args {
 }
 
 #[derive(strum::EnumString)]
+#[strum(serialize_all = "lowercase")]
 enum Mode {
     Queue,
     Router,

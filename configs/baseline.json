@@ -31,19 +31,19 @@
   "stage1_rules": [
     {
       "msg_type": 0,
-      "processors": [0]
+      "processors": [0, 1]
     },
     {
       "msg_type": 1,
-      "processors": [1]
+      "processors": [1, 2]
     },
     {
       "msg_type": 2,
-      "processors": [2]
+      "processors": [2, 3]
     },
     {
       "msg_type": 3,
-      "processors": [3]
+      "processors": [3, 0]
     }
   ],
   "stage2_rules": [

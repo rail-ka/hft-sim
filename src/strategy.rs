@@ -10,10 +10,10 @@ use quanta::Clock;
 
 use crate::{
     config::Config,
-    types::{HandledMesage, Message},
+    types::{HandledMessage, Message},
 };
 
-pub type SrategyReceiver = Receiver<HandledMesage>;
+pub type SrategyReceiver = Receiver<HandledMessage>;
 
 pub struct StrategyWorker {
     pub id: u64,
@@ -64,7 +64,7 @@ impl StrategyWorker {
         let mut nanos_per_sec = 0u64;
 
         while let Ok(item) = receiver.recv() {
-            let HandledMesage {
+            let HandledMessage {
                 msg:
                     Message {
                         ty,
@@ -80,7 +80,7 @@ impl StrategyWorker {
             let _processing_time = timestamp - processing_ts;
 
             let last = &mut seq_arr[producer_id as usize][ty as usize];
-            if *last > seq {
+            if *last >= seq {
                 errors += 1;
             }
             *last = seq;
