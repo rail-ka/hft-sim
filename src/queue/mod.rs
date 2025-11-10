@@ -176,8 +176,7 @@ pub fn run(config: Config) -> eyre::Result<()> {
     }
     drop(stage1);
 
-    for sec in 0..config.duration_secs {
-        std::thread::sleep(Duration::from_secs(1));
+    let mut print_histogram = || {
         p_histogram.refresh();
         c_histogram.refresh();
         let p50 = (p_histogram.value_at_quantile(0.5) as f64) / 1000.00;
@@ -185,13 +184,19 @@ pub fn run(config: Config) -> eyre::Result<()> {
         let p99 = (p_histogram.value_at_quantile(0.99) as f64) / 1000.00;
         let p999 = (p_histogram.value_at_quantile(0.999) as f64) / 1000.00;
         let max = (p_histogram.max() as f64) / 1000.00;
-        info!(sec, p50, p90, p99, p999, max, "process");
+        info!(p50, p90, p99, p999, max, "process");
         let p50 = (c_histogram.value_at_quantile(0.5) as f64) / 1000.00;
         let p90 = (c_histogram.value_at_quantile(0.9) as f64) / 1000.00;
         let p99 = (c_histogram.value_at_quantile(0.99) as f64) / 1000.00;
         let p999 = (c_histogram.value_at_quantile(0.999) as f64) / 1000.00;
         let max = (c_histogram.max() as f64) / 1000.00;
-        info!(sec, p50, p90, p99, p999, max, "stage");
+        info!(p50, p90, p99, p999, max, "stage");
+    };
+
+    for sec in 0..config.duration_secs {
+        std::thread::sleep(Duration::from_secs(1));
+        info!(sec);
+        print_histogram();
     }
 
     for j in producers_handles {
@@ -203,6 +208,8 @@ pub fn run(config: Config) -> eyre::Result<()> {
     for j in strategies_handles {
         j.join().unwrap();
     }
+
+    print_histogram();
 
     let zero_messages_counts = zero_messages_counts.load(Ordering::SeqCst);
     let handled_zero_messages_counts = handled_zero_messages_counts.load(Ordering::SeqCst);

@@ -3,7 +3,7 @@
   "duration_secs": 10,
   "producers": {
     "count": 4,
-    "messages_per_sec": 3000000,
+    "messages_per_sec": 1000000,
     "distribution": {
       "msg_type_0": 0.25,
       "msg_type_1": 0.25,
