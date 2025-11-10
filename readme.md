@@ -32,3 +32,9 @@ samply record ./target/profiling/hft /Users/railka/lab/rust/hft/configs/baseline
 stage1 будет принимать сообщения от producer и отправлять processor на основе конфига: если processor один, то ему, если несколько, то тому, который менее загружен. Если processor загружен, откладываем во внутреннюю очередь.
 
 stage2 будет принимать сообщения от processor, валидировать сортировку/очередность, отправлять strategy.
+
+для stage2 какая будет матрица?
+- для каждого producer будет создана SPSC. например 4.
+- для каждого strategy тоже свой SPSC: 3.
+- stage2 хранит producers: Vec<Receiver>, strategies: Vec<Sender>
+- мониторит все `Vec<Receiver>` в цикле

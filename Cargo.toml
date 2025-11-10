@@ -30,6 +30,7 @@ crossbeam-channel = "0.5"
 rtrb = "0.3"
 ringbuf = "0.4"
 disruptor = "3.6"
+measured = "0.0.24"
 
 [profile.release]
 lto = true

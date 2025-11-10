@@ -30,6 +30,7 @@ impl Stage1 {
         }
         let index = (msg.producer_id as usize) % rule.len();
         rule[index].try_send(msg).is_ok()
+        // if we need balancing (but not ordering reguired):
         // rule.iter()
         //     .min_by_key(|q| q.len())
         //     .unwrap()
