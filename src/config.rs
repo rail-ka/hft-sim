@@ -1,3 +1,4 @@
+use eyre::bail;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs::read_to_string, path::Path};
 
@@ -21,9 +22,17 @@ impl Config {
         info!("config_path: {}", path.to_string_lossy());
         let config_data = read_to_string(path)?;
         let config: Self = serde_json::from_str(&config_data)?;
+
+        if config.strategies.count as usize != config.strategies.processing_times_ns.len() {
+            bail!("strategies count error");
+        }
+
         let fmt = human_format::Formatter::new();
         let messages_per_sec = fmt.format(config.producers.messages_per_sec as f64);
-        info!(messages_per_sec, config.producers.count, config.processors.count, config.strategies.count);
+        info!(
+            messages_per_sec,
+            config.producers.count, config.processors.count, config.strategies.count
+        );
         Ok(config)
     }
 }

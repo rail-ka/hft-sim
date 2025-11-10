@@ -7,3 +7,5 @@ pub struct Stage1 {
 impl Stage1 {
     pub fn send(&self, msg: Message) {}
 }
+
+pub fn run() {}

@@ -6,9 +6,8 @@ use std::{
     thread,
 };
 
-use eyre::bail;
-use itertools::Itertools;
 use crossbeam_channel::bounded;
+use itertools::Itertools;
 
 use crate::{
     config::Config, processor::ProcessorWorker, producer::ProducerWorker, strategy::StrategyWorker,
@@ -35,11 +34,6 @@ pub fn run(config: Config) -> eyre::Result<()> {
     let mut producers_handles = Vec::with_capacity(c_producers.count as usize);
     let mut processors_handles = Vec::with_capacity(c_processors.count as usize);
     let mut strategies_handles = Vec::with_capacity(c_strategies.count as usize);
-
-    if c_strategies.count as usize != c_strategies.processing_times_ns.len() {
-        bail!("strategies count error");
-    }
-
     let mut strategies_queues = Vec::with_capacity(c_strategies.count as usize);
 
     let strategies_iter = c_strategies

@@ -1,7 +1,6 @@
 use std::{fs::File, path::PathBuf};
 
 mod config;
-mod lmax;
 mod log;
 mod processor;
 mod producer;
@@ -24,8 +23,8 @@ struct Args {
     #[argh(positional)]
     config: PathBuf,
 
-    /// mode: queue, router, lmax
-    #[argh(option, default = "Mode::Router")]
+    /// mode: queue, router
+    #[argh(option, short = 'm', default = "Mode::Router")]
     mode: Mode,
 }
 
@@ -34,7 +33,6 @@ struct Args {
 enum Mode {
     Queue,
     Router,
-    Lmax,
 }
 
 fn main() -> eyre::Result<()> {
@@ -55,7 +53,6 @@ fn main() -> eyre::Result<()> {
     match args.mode {
         Mode::Queue => queue::run(config)?,
         Mode::Router => router::run(config)?,
-        Mode::Lmax => lmax::run(config)?,
     }
 
     if let Ok(report) = guard.report().build() {

@@ -7,3 +7,5 @@ pub struct Stage2 {
 impl Stage2 {
     pub fn send(&self, msg: HandledMessage) {}
 }
+
+pub fn run() {}

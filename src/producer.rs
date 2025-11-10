@@ -38,13 +38,12 @@ impl ProducerWorker {
             zero_messages_counts,
         } = self;
         let fmt = human_format::Formatter::new();
-        let mut ts = timestamp();
         let clock = Clock::new();
         let mut msg = Message {
             producer_id: id,
             ty: 0,
             seq: 0,
-            timestamp: 0,
+            timestamp: timestamp(),
         };
 
         distribution.sort_unstable_by_key(|(k, _)| *k);
@@ -56,12 +55,51 @@ impl ProducerWorker {
 
         let mut total_msg = 0usize;
         let mut total_zero_msgs = 0u64;
+        // let mut wait_cycles = 0u64;
+        let mut iter = 0u64;
 
         let mut msg_routes = stage1_rules
             .into_iter()
             .sorted_by_key(|i| i.msg_type)
             .map(|i| i.processors.into_iter().cycle())
             .collect_vec();
+
+        let mut closure = |duration_ms: u64, msg_per_ms: u64, nano_per_msg: u64| {
+            for ms in 0..duration_ms {
+                let start_of_ms_raw = clock.raw();
+
+                for i in 0..msg_per_ms {
+                    let target_nanos = (i + 1) * nano_per_msg;
+                    let mut delta = clock.delta_as_nanos(start_of_ms_raw, clock.raw());
+                    while delta < target_nanos {
+                        delta = clock.delta_as_nanos(start_of_ms_raw, clock.raw());
+                        // wait_cycles += 1;
+                    }
+
+                    let msg_type = distribution_pattern.next().unwrap();
+                    msg.seq += 1;
+                    msg.ty = msg_type;
+                    msg.timestamp += delta;
+                    let processor_id: u64 = msg_routes[msg_type as usize].next().unwrap();
+                    let res = processors[processor_id as usize].try_send(msg);
+                    if res.is_err() {
+                        err_arr[msg_type as usize][processor_id as usize] += 1;
+                    } else {
+                        total_msg += 1;
+                        if msg_type == 0 {
+                            total_zero_msgs += 1;
+                        }
+                    }
+                }
+                if ms % 1000 == 0 {
+                    let total_msg = fmt.format(total_msg as f64);
+                    // let wait_cycles_s = fmt.format(wait_cycles as f64);
+                    // wait_cycles = 0;
+                    iter += 1;
+                    info!(id, iter, total_msg);
+                }
+            }
+        };
 
         match burst_pattern {
             Some(pattern) => {
@@ -78,43 +116,9 @@ impl ProducerWorker {
                     .collect_vec();
                 info!(?pattern);
 
-                let mut prev = clock.raw();
-
                 'a: loop {
                     for (duration_ms, msg_per_ms, nano_per_msg) in pattern.iter().copied() {
-                        for ms in 0..duration_ms {
-                            for _ in 0..msg_per_ms {
-                                let mut raw = clock.raw();
-                                let mut delta = clock.delta_as_nanos(prev, raw);
-                                while delta < nano_per_msg {
-                                    std::hint::spin_loop();
-                                    raw = clock.raw();
-                                    delta = clock.delta_as_nanos(prev, raw);
-                                }
-                                prev = raw;
-                                ts += delta;
-
-                                let msg_type = distribution_pattern.next().unwrap();
-                                msg.seq += 1;
-                                msg.ty = msg_type;
-                                msg.timestamp = ts;
-                                let processor_id: u64 = msg_routes[msg.ty as usize].next().unwrap();
-                                let res = processors[processor_id as usize].try_send(msg);
-                                if res.is_err() {
-                                    err_arr[msg.ty as usize][processor_id as usize] += 1;
-                                } else {
-                                    total_msg += 1;
-                                    if msg.ty == 0 {
-                                        total_zero_msgs += 1;
-                                    }
-                                }
-                            }
-                            let sec = ms / 1000;
-                            if ms % 1000 == 0 {
-                                let total_msg = fmt.format(total_msg as f64);
-                                info!(id, sec, total_msg);
-                            }
-                        }
+                        closure(duration_ms, msg_per_ms, nano_per_msg);
                         let (n, overflow) = duration_mss.overflowing_sub(duration_ms);
                         if overflow {
                             info!(duration_mss, duration_ms, "time end");
@@ -125,56 +129,11 @@ impl ProducerWorker {
                 }
             }
             None => {
+                let duration_ms = duration_secs * 1000;
+                let msg_per_ms = messages_per_sec / 1000;
                 let nano_per_msg = 1_000_000_000u64 / messages_per_sec;
                 info!(nano_per_msg);
-
-                for sec in 0..duration_secs {
-                    debug!(id, sec);
-
-                    let mut ts = timestamp();
-                    let start_of_second_raw = clock.raw();
-                    // let mut prev = clock.raw();
-                    let mut wait_cycles = 0u64;
-
-                    for i in 0..messages_per_sec {
-                        let target_nanos = (i + 1) * nano_per_msg;
-                        let mut delta = clock.delta_as_nanos(start_of_second_raw, clock.raw());
-
-                        while delta < target_nanos {
-                            std::hint::spin_loop();
-                            delta = clock.delta_as_nanos(start_of_second_raw, clock.raw());
-                            wait_cycles += 1;
-                        }
-                        ts += delta;
-
-                        // let mut raw = clock.raw();
-                        // let mut delta = clock.delta_as_nanos(prev, raw);
-                        // while delta < nano_per_msg {
-                        //     std::hint::spin_loop();
-                        //     raw = clock.raw();
-                        //     delta = clock.delta_as_nanos(prev, raw);
-                        // }
-                        // prev = raw;
-                        // ts += delta;
-
-                        let msg_type = distribution_pattern.next().unwrap();
-                        msg.seq += 1;
-                        msg.timestamp = ts;
-                        msg.ty = msg_type;
-                        let processor_id: u64 = msg_routes[msg.ty as usize].next().unwrap();
-                        let res = processors[processor_id as usize].try_send(msg);
-                        if res.is_err() {
-                            err_arr[msg_type as usize][processor_id as usize] += 1;
-                        } else {
-                            total_msg += 1;
-                            if msg_type == 0 {
-                                total_zero_msgs += 1;
-                            }
-                        }
-                    }
-                    let total_msg = fmt.format(total_msg as f64);
-                    info!(id, sec, total_msg, wait_cycles);
-                }
+                closure(duration_ms, msg_per_ms, nano_per_msg);
             }
         }
 
