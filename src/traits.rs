@@ -22,7 +22,13 @@ impl StrategyReceiver for rtrb::Consumer<HandledMessage> {
             info!("StrategyReceiver stopped");
             return None;
         }
+        let mut count = 0;
         loop {
+            if count > 1000 && self.is_abandoned() {
+                info!("StrategyReceiver stopped");
+                return None;
+            }
+            count += 1;
             if !self.is_empty() {
                 break;
             }
