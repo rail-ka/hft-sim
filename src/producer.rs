@@ -16,7 +16,7 @@ pub struct ProducerWorker<S: ProducerSender> {
     pub distribution: Vec<(u64, f64)>,
     pub burst_pattern: Option<Vec<Phase>>,
     pub stage1: S,
-    pub zero_messages_counts: Arc<AtomicU64>,
+    pub zero_messages: Arc<AtomicU64>,
     pub start_ts: u64,
     pub clock: Clock,
 }
@@ -30,7 +30,7 @@ impl<S: ProducerSender> ProducerWorker<S> {
             mut distribution,
             burst_pattern,
             mut stage1,
-            zero_messages_counts,
+            zero_messages: zero_messages_counts,
             start_ts,
             clock,
         } = self;

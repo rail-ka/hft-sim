@@ -1,4 +1,5 @@
 use eyre::bail;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs::read_to_string, path::Path};
 
@@ -53,16 +54,61 @@ pub struct Producers {
     pub burst_pattern: Option<Vec<Phase>>,
 }
 
+impl Producers {
+    pub fn distribution_parse(&self) -> Vec<(u64, f64)> {
+        self.distribution
+            .iter()
+            .map(|(k, v)| {
+                let id: u64 = k.trim_start_matches("msg_type_").parse().unwrap();
+                (id, *v)
+            })
+            .collect::<Vec<_>>()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Processors {
     pub count: u64,
     pub processing_times_ns: HashMap<String, u64>,
 }
 
+impl Processors {
+    pub fn parse(&self) -> Vec<(u64, u64)> {
+        let processors_processing_times = self
+            .processing_times_ns
+            .iter()
+            .map(|(k, v)| {
+                let id: u64 = k.trim_start_matches("msg_type_").parse().unwrap();
+                (id, *v)
+            })
+            .sorted_unstable_by_key(|(id, _)| *id)
+            .collect::<Vec<_>>();
+        debug!(?processors_processing_times);
+        processors_processing_times
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Strategies {
     pub count: u64,
     pub processing_times_ns: HashMap<String, u64>,
+}
+
+impl Strategies {
+    pub fn parse(&self) -> Vec<(usize, (u64, u64))> {
+        let strategies = self
+            .processing_times_ns
+            .iter()
+            .map(|(k, v)| {
+                let id: u64 = k.trim_start_matches("strategy_").parse().unwrap();
+                (id, *v)
+            })
+            .sorted_unstable_by_key(|(id, _)| *id)
+            .enumerate()
+            .collect_vec();
+        debug!(?strategies);
+        strategies
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

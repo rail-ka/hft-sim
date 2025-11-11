@@ -2,12 +2,17 @@ use std::{fs::File, path::PathBuf};
 
 use arrayvec::ArrayVec;
 
+use crate::state::State;
+
 mod config;
 mod log;
 mod processor;
 mod producer;
 mod queue;
+mod queue_router;
 mod router;
+mod router_queue;
+mod state;
 mod strategy;
 mod traits;
 mod types;
@@ -51,9 +56,11 @@ fn main() -> eyre::Result<()> {
 
     let config = config::Config::init(args.config.canonicalize()?)?;
 
+    let state = State::new();
+
     match args.mode {
-        Mode::Queue => queue::run(config)?,
-        Mode::Router => router::run(config)?,
+        Mode::Queue => queue::run(config, state)?,
+        Mode::Router => router::run(config, state)?,
     }
 
     if let Ok(report) = guard.report().build() {
