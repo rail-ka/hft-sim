@@ -7,7 +7,7 @@ use crate::{
     config::Config,
     processor::ProcessorWorker,
     producer::ProducerWorker,
-    queue::{stage1::Stage1, traits::QueueProcessorSender},
+    queue::{stage1::Stage1Queue, traits::QueueProcessorSender},
     state::State,
     strategy::StrategyWorker,
 };
@@ -105,7 +105,7 @@ pub fn run(config: Config, mut state: State) -> eyre::Result<()> {
 
     let distribution = c_producers.distribution_parse();
 
-    let stage1 = Stage1::new(processors_queues, stage1_rules);
+    let stage1 = Stage1Queue::new(processors_queues, stage1_rules);
 
     let producers_handles = (0..c_producers.count)
         .map(|i| {

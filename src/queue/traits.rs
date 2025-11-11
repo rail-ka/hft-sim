@@ -44,8 +44,8 @@ impl ProcessorSender for QueueProcessorSender {
     }
 }
 
-impl ProducerSender for super::stage1::Stage1 {
+impl ProducerSender for super::stage1::Stage1Queue {
     fn send(&mut self, msg: Message) -> bool {
-        super::stage1::Stage1::send(self, msg)
+        super::stage1::Stage1Queue::send(self, msg)
     }
 }

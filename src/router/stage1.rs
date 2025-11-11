@@ -1,6 +1,8 @@
 use std::thread::{self, JoinHandle};
 
 use core_affinity::CoreId;
+use hdrhistogram::sync::Recorder;
+use quanta::Clock;
 use rtrb::{Consumer, Producer, RingBuffer};
 
 use crate::{
@@ -13,10 +15,18 @@ pub struct Stage1 {
     pub processor_prod: Arr<Producer<Message>>,
     pub producer_cons: Arr<Consumer<Message>>,
     pub stage1_rules: Arr<Stage1Rule>,
+    pub histogram: Recorder<u64>,
+    start_ts: u64,
+    clock: Clock,
 }
 
 impl Stage1 {
-    pub fn new(config: &Config) -> (Self, Arr<Consumer<Message>>, Arr<Producer<Message>>) {
+    pub fn new(
+        config: &Config,
+        histogram: Recorder<u64>,
+        start_ts: u64,
+        clock: Clock,
+    ) -> (Self, Arr<Consumer<Message>>, Arr<Producer<Message>>) {
         let (producer_prod, producer_cons): (Arr<_>, Arr<_>) = (0..config.producers.count)
             .map(|_| RingBuffer::<Message>::new(4_000_000))
             .unzip();
@@ -27,6 +37,9 @@ impl Stage1 {
             stage1_rules: config.stage1_rules.iter().cloned().collect(),
             processor_prod,
             producer_cons,
+            histogram,
+            start_ts,
+            clock,
         };
         (s, processor_cons, producer_prod)
     }
@@ -45,6 +58,9 @@ impl Stage1 {
                     mut processor_prod,
                     mut producer_cons,
                     stage1_rules,
+                    mut histogram,
+                    start_ts,
+                    clock,
                 } = self;
                 let mut len = producer_cons.len();
                 'a: loop {
@@ -72,6 +88,8 @@ impl Stage1 {
                                 .unwrap();
                             let sender = &mut processor_prod[processor as usize];
                             sender.push(msg).unwrap();
+                            let timestamp = clock.delta_as_nanos(start_ts, clock.raw());
+                            histogram.saturating_record(timestamp - msg.timestamp);
                         }
                     }
                 }

@@ -7,6 +7,8 @@ use crate::{
 };
 
 use core_affinity::CoreId;
+use hdrhistogram::sync::Recorder;
+use quanta::Clock;
 // use ringbuf::{
 //     HeapRb,
 //     traits::{Consumer as RConsumer, Observer, Split},
@@ -17,11 +19,17 @@ pub struct Stage2 {
     pub processor_cons: Arr<Consumer<HandledMessage>>,
     pub strategy_prod: Arr<Producer<HandledMessage>>,
     pub stage2_rules: Arr<Stage2Rule>,
+    pub histogram: Recorder<u64>,
+    start_ts: u64,
+    clock: Clock,
 }
 
 impl Stage2 {
     pub fn new(
         config: &Config,
+        histogram: Recorder<u64>,
+        start_ts: u64,
+        clock: Clock,
     ) -> (
         Self,
         Arr<Consumer<HandledMessage>>,
@@ -39,6 +47,9 @@ impl Stage2 {
             processor_cons,
             strategy_prod,
             stage2_rules: config.stage2_rules.iter().cloned().collect(),
+            histogram,
+            start_ts,
+            clock,
         };
         (s, strategy_cons, processor_prod)
     }
@@ -57,6 +68,9 @@ impl Stage2 {
                     mut processor_cons,
                     mut strategy_prod,
                     stage2_rules,
+                    mut histogram,
+                    start_ts,
+                    clock,
                 } = self;
                 // let (p, mut c) = HeapRb::<HandledMessage>::new(1000_000).split();
                 let mut len = processor_cons.len();
@@ -74,7 +88,6 @@ impl Stage2 {
                             continue;
                         }
                         let slots = cons.slots();
-                        // let chunks = cons.read_chunk(slots).unwrap();
                         for _ in 0..slots {
                             let msg = cons.pop().unwrap();
                             let strategy = stage2_rules
@@ -84,6 +97,8 @@ impl Stage2 {
                                 .strategy;
                             let strategy_sender = &mut strategy_prod[strategy as usize];
                             strategy_sender.push(msg).unwrap();
+                            let timestamp = clock.delta_as_nanos(start_ts, clock.raw());
+                            histogram.saturating_record(timestamp - msg.processing_ts);
                         }
                     }
                 }

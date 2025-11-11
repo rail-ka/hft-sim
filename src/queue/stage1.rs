@@ -4,11 +4,11 @@ use itertools::Itertools;
 use crate::{Arr, config::Stage1Rule, types::Message};
 
 #[derive(Clone)]
-pub struct Stage1 {
+pub struct Stage1Queue {
     msg_routes: Arr<Arr<Sender<Message>>>,
 }
 
-impl Stage1 {
+impl Stage1Queue {
     pub fn new(processors: Vec<Sender<Message>>, stage1_rules: Vec<Stage1Rule>) -> Self {
         let msg_routes = stage1_rules
             .into_iter()

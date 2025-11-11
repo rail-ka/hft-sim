@@ -26,7 +26,12 @@ pub fn run(config: Config, mut state: State) -> eyre::Result<()> {
         stage2_rules: _,
     } = config.clone();
 
-    let (stage2, strategies_cons, processors_prod) = Stage2::new(&config);
+    let (stage2, strategies_cons, processors_prod) = Stage2::new(
+        &config,
+        state.stage2_h.recorder(),
+        state.start_ts,
+        state.clock.clone(),
+    );
     let stage2_handle = stage2.run(state.core_ids.pop());
 
     let strategies_handles = c_strategies
@@ -63,7 +68,12 @@ pub fn run(config: Config, mut state: State) -> eyre::Result<()> {
 
     let processors_processing_times = c_processors.parse();
 
-    let (stage1, processors_cons, producers_prod) = Stage1::new(&config);
+    let (stage1, processors_cons, producers_prod) = Stage1::new(
+        &config,
+        state.stage1_h.recorder(),
+        state.start_ts,
+        state.clock.clone(),
+    );
     let stage1_handle = stage1.run(state.core_ids.pop());
 
     let iter = processors_prod.into_iter().zip(processors_cons).enumerate();

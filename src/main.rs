@@ -36,10 +36,12 @@ struct Args {
 }
 
 #[derive(strum::EnumString)]
-#[strum(serialize_all = "lowercase")]
+#[strum(serialize_all = "kebab-case")]
 enum Mode {
     Queue,
     Router,
+    RouterQueue,
+    QueueRouter,
 }
 
 fn main() -> eyre::Result<()> {
@@ -61,6 +63,8 @@ fn main() -> eyre::Result<()> {
     match args.mode {
         Mode::Queue => queue::run(config, state)?,
         Mode::Router => router::run(config, state)?,
+        Mode::RouterQueue => router_queue::run(config, state)?,
+        Mode::QueueRouter => queue_router::run(config, state)?,
     }
 
     if let Ok(report) = guard.report().build() {
