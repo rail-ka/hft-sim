@@ -201,14 +201,14 @@ pub fn run(config: Config) -> eyre::Result<()> {
     for j in producers_handles {
         j.join().unwrap();
     }
+    stage1_handle.join().unwrap();
     for j in processors_handles {
         j.join().unwrap();
     }
+    stage2_handle.join().unwrap();
     for j in strategies_handles {
         j.join().unwrap();
     }
-    stage1_handle.join().unwrap();
-    stage2_handle.join().unwrap();
 
     print_histogram();
 
