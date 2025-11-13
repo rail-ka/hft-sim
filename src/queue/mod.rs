@@ -42,7 +42,7 @@ pub fn run(config: Config, mut state: State) -> eyre::Result<()> {
                 id,
                 receiver: r,
                 processing_time: v,
-                handled_zero_messages: state.handled_zero_messages.clone(),
+                message_count: state.delivered.clone(),
                 start_ts: state.start_ts,
                 clock: state.clock.clone(),
                 p_histogram: state.p_histogram.recorder(),
@@ -80,11 +80,12 @@ pub fn run(config: Config, mut state: State) -> eyre::Result<()> {
             };
             let worker = ProcessorWorker {
                 id,
-                processing_times: processors_processing_times.clone(),
+                message_count: state.processed.clone(),
                 receiver: r,
                 start_ts: state.start_ts,
                 clock: state.clock.clone(),
                 sender,
+                processing_times: processors_processing_times.iter().cloned().collect(),
             };
             let cid = state.core_ids.pop();
             thread::Builder::new()
@@ -115,7 +116,7 @@ pub fn run(config: Config, mut state: State) -> eyre::Result<()> {
                 messages_per_sec: c_producers.messages_per_sec,
                 distribution: distribution.clone(),
                 burst_pattern: c_producers.burst_pattern.clone(),
-                zero_messages: state.zero_messages.clone(),
+                message_count: state.produced.clone(),
                 stage1: stage1.clone(),
                 start_ts: state.start_ts,
                 clock: state.clock.clone(),

@@ -1,13 +1,10 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicU64, Ordering},
-};
+use std::sync::atomic::Ordering;
 
 use itertools::Itertools;
 use quanta::Clock;
 use rand::{rng, seq::SliceRandom};
 
-use crate::{config::Phase, traits::ProducerSender, types::Message};
+use crate::{config::Phase, state::MessagesCounter, traits::ProducerSender, types::Message};
 
 pub struct ProducerWorker<S: ProducerSender> {
     pub id: u64,
@@ -16,13 +13,13 @@ pub struct ProducerWorker<S: ProducerSender> {
     pub distribution: Vec<(u64, f64)>,
     pub burst_pattern: Option<Vec<Phase>>,
     pub stage1: S,
-    pub zero_messages: Arc<AtomicU64>,
+    pub message_count: MessagesCounter,
     pub start_ts: u64,
     pub clock: Clock,
 }
 
 impl<S: ProducerSender> ProducerWorker<S> {
-    pub fn run(self) {
+    pub fn run(self) -> (u64, u64) {
         let Self {
             id,
             duration_secs,
@@ -30,7 +27,7 @@ impl<S: ProducerSender> ProducerWorker<S> {
             mut distribution,
             burst_pattern,
             mut stage1,
-            zero_messages: zero_messages_counts,
+            message_count,
             start_ts,
             clock,
         } = self;
@@ -49,10 +46,12 @@ impl<S: ProducerSender> ProducerWorker<S> {
 
         let mut err_arr = [0u64; 8];
 
-        let mut total_msg = 0usize;
-        let mut total_zero_msgs = 0u64;
-        // let mut wait_cycles = 0u64;
+        let mut total_msg = 0u64;
+        let mut zero_msgs = 0u64;
+        let mut wait_cycles = 0u64;
         let mut iter = 0u64;
+        let mut msg_per_sec = 0u64;
+        let mut zero_msg_per_sec = 0u64;
 
         let mut closure = |duration_ms: u64, msg_per_ms: u64, nano_per_msg: u64| {
             for ms in 0..duration_ms {
@@ -63,7 +62,7 @@ impl<S: ProducerSender> ProducerWorker<S> {
                     let mut delta = clock.delta_as_nanos(start_of_ms_raw, clock.raw());
                     while delta < target_nanos {
                         delta = clock.delta_as_nanos(start_of_ms_raw, clock.raw());
-                        // wait_cycles += 1;
+                        wait_cycles += 1;
                     }
 
                     let msg_type = distribution_pattern.next().unwrap();
@@ -75,17 +74,31 @@ impl<S: ProducerSender> ProducerWorker<S> {
                         err_arr[msg_type as usize] += 1;
                     } else {
                         total_msg += 1;
+                        msg_per_sec += 1;
                         if msg_type == 0 {
-                            total_zero_msgs += 1;
+                            zero_msgs += 1;
+                            zero_msg_per_sec += 1;
                         }
                     }
                 }
                 if ms % 1000 == 0 {
-                    let total_msg = fmt.format(total_msg as f64);
-                    // let wait_cycles_s = fmt.format(wait_cycles as f64);
-                    // wait_cycles = 0;
+                    let wait_cycles_s = fmt.format(wait_cycles as f64);
+                    wait_cycles = 0;
                     iter += 1;
-                    info!(id, iter, total_msg);
+                    info!(
+                        id,
+                        iter,
+                        total_msg = fmt.format(total_msg as f64),
+                        wait_cycles_s
+                    );
+                    message_count
+                        .total
+                        .fetch_add(msg_per_sec, Ordering::Release);
+                    message_count
+                        .zero
+                        .fetch_add(zero_msg_per_sec, Ordering::Release);
+                    msg_per_sec = 0;
+                    zero_msg_per_sec = 0;
                 }
             }
         };
@@ -131,9 +144,8 @@ impl<S: ProducerSender> ProducerWorker<S> {
                 error!(ty, "{}", fmt.format(*count as f64));
             }
         }
-        zero_messages_counts.fetch_add(total_zero_msgs, Ordering::SeqCst);
-        let total_msg = fmt.format(total_msg as f64);
-        info!(id, total_msg);
+        info!(id, total_msg = fmt.format(total_msg as f64));
+        (total_msg, zero_msgs)
     }
 }
 

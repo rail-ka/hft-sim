@@ -1,12 +1,10 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicU64, Ordering},
-};
+use std::sync::atomic::Ordering;
 
 use hdrhistogram::sync::Recorder;
 use quanta::Clock;
 
 use crate::{
+    state::MessagesCounter,
     traits::StrategyReceiver,
     types::{HandledMessage, Message},
 };
@@ -15,20 +13,20 @@ pub struct StrategyWorker<R: StrategyReceiver> {
     pub id: u64,
     pub receiver: R,
     pub processing_time: u64,
-    pub handled_zero_messages: Arc<AtomicU64>,
     pub start_ts: u64,
     pub clock: Clock,
     pub p_histogram: Recorder<u64>,
     pub c_histogram: Recorder<u64>,
+    pub message_count: MessagesCounter,
 }
 
 impl<R: StrategyReceiver> StrategyWorker<R> {
-    pub fn run(self) {
+    pub fn run(self) -> (u64, u64) {
         let Self {
             id,
             mut receiver,
             processing_time,
-            handled_zero_messages: handled_zero_messages_counts,
+            message_count,
             start_ts,
             clock,
             mut p_histogram,
@@ -39,9 +37,11 @@ impl<R: StrategyReceiver> StrategyWorker<R> {
 
         let mut errors = 0usize;
         let mut prev = clock.raw();
-        let mut total_msg = 0usize;
+        let mut total_msg = 0u64;
         let mut total_zero_msgs = 0u64;
         let mut nanos_per_sec = 0u64;
+        let mut msg_per_sec = 0u64;
+        let mut zero_msg_per_sec = 0u64;
 
         while let Some(item) = receiver.next() {
             let HandledMessage {
@@ -75,14 +75,24 @@ impl<R: StrategyReceiver> StrategyWorker<R> {
             }
             prev = raw;
             total_msg += 1;
+            msg_per_sec += 1;
             if ty == 0 {
                 total_zero_msgs += 1;
+                zero_msg_per_sec += 1;
             }
 
             if nanos_per_sec < 1_000_000_000 {
                 nanos_per_sec += delta;
             } else {
                 nanos_per_sec = 0;
+                message_count
+                    .total
+                    .fetch_add(msg_per_sec, Ordering::Release);
+                message_count
+                    .zero
+                    .fetch_add(zero_msg_per_sec, Ordering::Release);
+                msg_per_sec = 0;
+                zero_msg_per_sec = 0;
                 let channel_len = receiver.len();
                 let channel_len = fmt.format(channel_len as f64);
                 let total_msg = fmt.format(total_msg as f64);
@@ -96,10 +106,11 @@ impl<R: StrategyReceiver> StrategyWorker<R> {
         if errors != 0 {
             error!(id, "{}", fmt.format(errors as f64));
         }
-        handled_zero_messages_counts.fetch_add(total_zero_msgs, Ordering::SeqCst);
-
-        let total_msg = fmt.format(total_msg as f64);
-        let total_zero_msgs = fmt.format(total_zero_msgs as f64);
-        info!(id, total_msg, total_zero_msgs);
+        info!(
+            id,
+            total_msg = fmt.format(total_msg as f64),
+            total_zero_msgs = fmt.format(total_zero_msgs as f64)
+        );
+        (total_msg, total_zero_msgs)
     }
 }
