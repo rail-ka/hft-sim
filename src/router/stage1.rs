@@ -5,20 +5,18 @@ use hdrhistogram::sync::Recorder;
 use quanta::Clock;
 use rtrb::{Consumer, Producer, RingBuffer};
 
-use crate::{
-    Arr,
-    config::{Config, Stage1Rule},
-    types::Message,
-};
+use crate::{Arr, config::Config, types::Message};
 
 pub struct Stage1 {
     pub processor_prod: Arr<Producer<Message>>,
     pub producer_cons: Arr<Consumer<Message>>,
-    pub stage1_rules: Arr<Stage1Rule>,
+    pub msg_type_to_processor: [u64; 8],
     pub histogram: Recorder<u64>,
     start_ts: u64,
     clock: Clock,
 }
+
+const CAPACITY: usize = 2usize.pow(16);
 
 impl Stage1 {
     pub fn new(
@@ -28,13 +26,20 @@ impl Stage1 {
         clock: Clock,
     ) -> (Self, Arr<Consumer<Message>>, Arr<Producer<Message>>) {
         let (producer_prod, producer_cons): (Arr<_>, Arr<_>) = (0..config.producers.count)
-            .map(|_| RingBuffer::<Message>::new(20_000_000))
+            .map(|_| RingBuffer::<Message>::new(CAPACITY))
             .unzip();
         let (processor_prod, processor_cons): (Arr<_>, Arr<_>) = (0..config.processors.count)
-            .map(|_| RingBuffer::<Message>::new(20_000_000))
+            .map(|_| RingBuffer::<Message>::new(CAPACITY))
             .unzip();
+
+        // Build O(1) lookup table: msg_type -> processor_id
+        let mut msg_type_to_processor = [0u64; 8];
+        for rule in config.stage1_rules.iter() {
+            msg_type_to_processor[rule.msg_type as usize] = *rule.processors.first().unwrap();
+        }
+
         let s = Self {
-            stage1_rules: config.stage1_rules.iter().cloned().collect(),
+            msg_type_to_processor,
             processor_prod,
             producer_cons,
             histogram,
@@ -57,7 +62,7 @@ impl Stage1 {
                 let Self {
                     mut processor_prod,
                     mut producer_cons,
-                    stage1_rules,
+                    msg_type_to_processor,
                     mut histogram,
                     start_ts,
                     clock,
@@ -79,13 +84,7 @@ impl Stage1 {
                         let slots = cons.slots();
                         for _ in 0..slots {
                             let msg = cons.pop().unwrap();
-                            let processor = *stage1_rules
-                                .iter()
-                                .find(|i| i.msg_type == msg.ty)
-                                .unwrap()
-                                .processors
-                                .first()
-                                .unwrap();
+                            let processor = msg_type_to_processor[msg.ty as usize];
                             let sender = &mut processor_prod[processor as usize];
                             sender.push(msg).unwrap();
                             let timestamp = clock.delta_as_nanos(start_ts, clock.raw());

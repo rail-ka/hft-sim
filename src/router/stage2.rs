@@ -1,10 +1,6 @@
 use std::thread::{self, JoinHandle};
 
-use crate::{
-    Arr,
-    config::{Config, Stage2Rule},
-    types::HandledMessage,
-};
+use crate::{Arr, config::Config, types::HandledMessage};
 
 use core_affinity::CoreId;
 use hdrhistogram::sync::Recorder;
@@ -18,11 +14,13 @@ use rtrb::{Consumer, Producer, RingBuffer};
 pub struct Stage2 {
     pub processor_cons: Arr<Consumer<HandledMessage>>,
     pub strategy_prod: Arr<Producer<HandledMessage>>,
-    pub stage2_rules: Arr<Stage2Rule>,
+    pub msg_type_to_strategy: [u64; 8],
     pub histogram: Recorder<u64>,
     start_ts: u64,
     clock: Clock,
 }
+
+const CAPACITY: usize = 2usize.pow(16);
 
 impl Stage2 {
     pub fn new(
@@ -36,17 +34,23 @@ impl Stage2 {
         Arr<Producer<HandledMessage>>,
     ) {
         let (strategy_prod, strategy_cons): (Arr<_>, Arr<_>) = (0..config.strategies.count)
-            .map(|_| RingBuffer::<HandledMessage>::new(20_000_000))
+            .map(|_| RingBuffer::<HandledMessage>::new(CAPACITY))
             .unzip();
 
         let (processor_prod, processor_cons): (Arr<_>, Arr<_>) = (0..config.processors.count)
-            .map(|_| RingBuffer::<HandledMessage>::new(20_000_000))
+            .map(|_| RingBuffer::<HandledMessage>::new(CAPACITY))
             .unzip();
+
+        // Build O(1) lookup table: msg_type -> strategy_id
+        let mut msg_type_to_strategy = [0u64; 8];
+        for rule in config.stage2_rules.iter() {
+            msg_type_to_strategy[rule.msg_type as usize] = rule.strategy;
+        }
 
         let s = Self {
             processor_cons,
             strategy_prod,
-            stage2_rules: config.stage2_rules.iter().cloned().collect(),
+            msg_type_to_strategy,
             histogram,
             start_ts,
             clock,
@@ -67,7 +71,7 @@ impl Stage2 {
                 let Self {
                     mut processor_cons,
                     mut strategy_prod,
-                    stage2_rules,
+                    msg_type_to_strategy,
                     mut histogram,
                     start_ts,
                     clock,
@@ -90,11 +94,7 @@ impl Stage2 {
                         let slots = cons.slots();
                         for _ in 0..slots {
                             let msg = cons.pop().unwrap();
-                            let strategy = stage2_rules
-                                .iter()
-                                .find(|i| i.msg_type == msg.msg.ty)
-                                .unwrap()
-                                .strategy;
+                            let strategy = msg_type_to_strategy[msg.msg.ty as usize];
                             let strategy_sender = &mut strategy_prod[strategy as usize];
                             strategy_sender.push(msg).unwrap();
                             let timestamp = clock.delta_as_nanos(start_ts, clock.raw());
