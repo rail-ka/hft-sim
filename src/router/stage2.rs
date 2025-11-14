@@ -36,11 +36,11 @@ impl Stage2 {
         Arr<Producer<HandledMessage>>,
     ) {
         let (strategy_prod, strategy_cons): (Arr<_>, Arr<_>) = (0..config.strategies.count)
-            .map(|_| RingBuffer::<HandledMessage>::new(10_000_000))
+            .map(|_| RingBuffer::<HandledMessage>::new(20_000_000))
             .unzip();
 
         let (processor_prod, processor_cons): (Arr<_>, Arr<_>) = (0..config.processors.count)
-            .map(|_| RingBuffer::<HandledMessage>::new(4_000_000))
+            .map(|_| RingBuffer::<HandledMessage>::new(20_000_000))
             .unzip();
 
         let s = Self {

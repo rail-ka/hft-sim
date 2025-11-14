@@ -28,10 +28,10 @@ impl Stage1 {
         clock: Clock,
     ) -> (Self, Arr<Consumer<Message>>, Arr<Producer<Message>>) {
         let (producer_prod, producer_cons): (Arr<_>, Arr<_>) = (0..config.producers.count)
-            .map(|_| RingBuffer::<Message>::new(4_000_000))
+            .map(|_| RingBuffer::<Message>::new(20_000_000))
             .unzip();
         let (processor_prod, processor_cons): (Arr<_>, Arr<_>) = (0..config.processors.count)
-            .map(|_| RingBuffer::<Message>::new(4_000_000))
+            .map(|_| RingBuffer::<Message>::new(20_000_000))
             .unzip();
         let s = Self {
             stage1_rules: config.stage1_rules.iter().cloned().collect(),

@@ -1,5 +1,3 @@
-use std::{thread, time::Duration};
-
 use crossbeam_channel::bounded;
 use itertools::Itertools;
 
@@ -25,7 +23,7 @@ pub fn run(config: Config, mut state: State) -> eyre::Result<()> {
         strategies: c_strategies,
         stage1_rules,
         stage2_rules,
-    } = config;
+    } = config.clone();
 
     let mut strategies_queues = Vec::with_capacity(c_strategies.count as usize);
 
@@ -48,19 +46,9 @@ pub fn run(config: Config, mut state: State) -> eyre::Result<()> {
                 p_histogram: state.p_histogram.recorder(),
                 c_histogram: state.c_histogram.recorder(),
             };
-            let cid = state.core_ids.pop();
-            thread::Builder::new()
-                .name(format!("strategy_{id}"))
-                .spawn(move || {
-                    if let Some(cid) = cid {
-                        let res = core_affinity::set_for_current(cid);
-                        if !res {
-                            warn!("cannot pin {cid:?} thread for strategy: {id}");
-                        }
-                    }
-                    worker.run();
-                })
-                .unwrap()
+            crate::utils::spawn_worker(format!("strategy_{id}"), &mut state.core_ids, move || {
+                worker.run();
+            })
         })
         .collect_vec();
 
@@ -87,19 +75,9 @@ pub fn run(config: Config, mut state: State) -> eyre::Result<()> {
                 sender,
                 processing_times: processors_processing_times.iter().cloned().collect(),
             };
-            let cid = state.core_ids.pop();
-            thread::Builder::new()
-                .name(format!("processor_{id}"))
-                .spawn(move || {
-                    if let Some(cid) = cid {
-                        let res = core_affinity::set_for_current(cid);
-                        if !res {
-                            warn!("cannot pin {cid:?} thread for processor: {id}");
-                        }
-                    }
-                    worker.run();
-                })
-                .unwrap()
+            crate::utils::spawn_worker(format!("processor_{id}"), &mut state.core_ids, move || {
+                worker.run();
+            })
         })
         .collect_vec();
     drop(strategies_queues);
@@ -121,28 +99,14 @@ pub fn run(config: Config, mut state: State) -> eyre::Result<()> {
                 start_ts: state.start_ts,
                 clock: state.clock.clone(),
             };
-            let cid = state.core_ids.pop();
-            thread::Builder::new()
-                .name(format!("producer_{i}"))
-                .spawn(move || {
-                    if let Some(cid) = cid {
-                        let res = core_affinity::set_for_current(cid);
-                        if !res {
-                            warn!("cannot pin {cid:?} thread for producer: {i}");
-                        }
-                    }
-                    worker.run();
-                })
-                .unwrap()
+            crate::utils::spawn_worker(format!("producer_{i}"), &mut state.core_ids, move || {
+                worker.run();
+            })
         })
         .collect_vec();
     drop(stage1);
 
-    for sec in 0..config.duration_secs {
-        std::thread::sleep(Duration::from_secs(1));
-        info!(sec);
-        state.print_histogram();
-    }
+    crate::utils::main_loop(config.duration_secs, &mut state);
 
     for j in producers_handles {
         j.join().unwrap();

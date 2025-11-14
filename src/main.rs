@@ -16,7 +16,7 @@ mod state;
 mod strategy;
 mod traits;
 mod types;
-// mod utils;
+mod utils;
 
 #[macro_use]
 extern crate tracing;
