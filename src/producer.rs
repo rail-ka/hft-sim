@@ -61,6 +61,7 @@ impl<S: ProducerSender> ProducerWorker<S> {
                     let target_nanos = (i + 1) * nano_per_msg;
                     let mut delta = clock.delta_as_nanos(start_of_ms_raw, clock.raw());
                     while delta < target_nanos {
+                        std::hint::spin_loop();
                         delta = clock.delta_as_nanos(start_of_ms_raw, clock.raw());
                         wait_cycles += 1;
                     }

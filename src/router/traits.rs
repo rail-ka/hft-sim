@@ -21,6 +21,7 @@ impl StrategyReceiver for rtrb::Consumer<HandledMessage> {
                 info!("StrategyReceiver stopped");
                 return None;
             }
+            std::hint::spin_loop();
         }
         let msg = self.pop().unwrap();
         Some(msg)
@@ -49,6 +50,7 @@ impl ProcessorReceiver for rtrb::Consumer<Message> {
                 info!("ProcessorReceiver stopped");
                 return None;
             }
+            std::hint::spin_loop();
         }
         let msg = self.pop().unwrap();
         Some(msg)
@@ -65,6 +67,7 @@ impl ProcessorSender for rtrb::Producer<HandledMessage> {
             if !self.is_full() {
                 break;
             }
+            std::hint::spin_loop();
         }
         self.push(msg).is_ok()
     }
@@ -76,6 +79,7 @@ impl ProducerSender for rtrb::Producer<Message> {
             if !self.is_full() {
                 break;
             }
+            std::hint::spin_loop();
         }
         self.push(msg).is_ok()
     }

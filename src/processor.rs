@@ -53,6 +53,7 @@ impl<S: ProcessorSender, R: ProcessorReceiver> ProcessorWorker<S, R> {
             let mut delta = clock.delta_as_nanos(prev, raw);
 
             while delta < processing_time {
+                std::hint::spin_loop();
                 raw = clock.raw();
                 delta = clock.delta_as_nanos(prev, raw);
             }
